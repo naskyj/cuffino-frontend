@@ -46,6 +46,14 @@ const CartPage = () => {
   const { clientSecret, setClientSecret, orderId, setOrderId } = useUtility();
   const { customizationImagesCustom, setCustomizationImagesCustom } =
     useUtilityII();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (user === null) {
+      router.push("/login?from=/cart");
+    }
+  }, [user, router]);
+
   // Refetch cart when page becomes visible
   useEffect(() => {
     if (user?.userId) {

@@ -190,6 +190,30 @@ export default function UserMeasurement() {
 
   return (
     <div className="space-y-6">
+      {/* Measurement Guide */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
+          📏 How to Measure — Quick Guide (all measurements in inches)
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-amber-900">
+          <div><strong>Neck:</strong> Around the base of your neck.</div>
+          <div><strong>Bust/Chest:</strong> Around the fullest part of your chest.</div>
+          <div><strong>Waist:</strong> Around the narrowest part of your torso.</div>
+          <div><strong>Hips:</strong> Around the fullest part of your hips.</div>
+          <div><strong>Shoulder Width:</strong> From shoulder point to shoulder point across the back.</div>
+          <div><strong>Arm Length:</strong> From shoulder point to wrist.</div>
+          <div><strong>Sleeve Length:</strong> From shoulder seam to desired cuff end.</div>
+          <div><strong>Leg Length:</strong> From waist/hip to desired hem length.</div>
+          <div><strong>Inseam:</strong> From crotch to ankle along inner leg.</div>
+          <div><strong>Thigh:</strong> Around the fullest part of the upper thigh.</div>
+          <div><strong>Calf:</strong> Around the fullest part of the lower leg.</div>
+          <div><strong>Height:</strong> Standing straight from floor to top of head.</div>
+        </div>
+        <p className="text-xs text-amber-700 mt-3 italic">
+          Tip: Measure over thin clothing and keep the tape firm but not tight.
+        </p>
+      </div>
+
       {/* Add New Measurement Form */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         {/* Header */}
@@ -327,8 +351,14 @@ export default function UserMeasurement() {
                   </button>
                   {showAdditionalField && (
                     <div className="px-4 pb-4 space-y-4">
-                      <FormikControl control="input" type="text" label="Preferences" name="preferences" placeholder="Enter preferences" className="w-full" />
-                      <FormikControl control="input" type="text" label="Additional Field" name="additionalField" placeholder="Enter additional information" className="w-full" />
+                      <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                        <strong>Format:</strong> Enter additional measurements as{" "}
+                        <code className="bg-blue-100 px-1 rounded font-mono">partName:measurement</code>.{" "}
+                        For example: <code className="bg-blue-100 px-1 rounded font-mono">ankle:9.5</code> or{" "}
+                        <code className="bg-blue-100 px-1 rounded font-mono">wrist:6.5</code>.
+                      </p>
+                      <FormikControl control="input" type="text" label="Preferences" name="preferences" placeholder="e.g., loose fit, extra room at shoulders" className="w-full" />
+                      <FormikControl control="input" type="text" label="Additional Measurement" name="additionalField" placeholder="e.g., ankle:9.5" className="w-full" />
                     </div>
                   )}
                 </div>

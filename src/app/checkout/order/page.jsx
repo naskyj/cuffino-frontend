@@ -228,12 +228,17 @@ const OrderCheckoutPage = () => {
           </Link>
         </div> */}
 
-            {/* Warning Message */}
-            <div className="border-2 border-amber-500 bg-amber-50 p-3 sm:p-4 mb-6 sm:mb-8 rounded-md">
+            {/* Production Timeline Notice */}
+            <div className="border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:p-5 mb-6 sm:mb-8 rounded-lg">
+              <p className="text-amber-800 text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wide">
+                Handcrafted with care — Your timeline
+              </p>
               <p className="text-amber-700 text-xs sm:text-sm leading-relaxed">
-                Kindly note that production timeline would be X -Y working days.
-                Ensure accurate size/ measurement have been provided on selected
-                order. If unsure of sizing, please refer to Sizing Chart.
+                Every piece is made to order. Standard garments are lovingly crafted and delivered within{" "}
+                <span className="font-semibold">45 days</span>. Orders with custom measurements or
+                personalised customisations — where the magic truly happens — are ready within{" "}
+                <span className="font-semibold">70 days</span>. Please ensure your sizes and measurements
+                are accurate before placing your order.
               </p>
             </div>
 

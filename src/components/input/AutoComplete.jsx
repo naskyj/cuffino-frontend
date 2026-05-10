@@ -4,7 +4,7 @@ import { Autocomplete, useJsApiLoader } from "@react-google-maps/api";
 const libraries = ["places"];
 
 const AddressAutocomplete = ({ form, name = "streetAddress", fieldNames = {} }) => {
-  const { city = "city", state = "state", postalCode = "postalCode" } = fieldNames;
+  const { city = "city", state = "state", postalCode = "postalCode", country = "country" } = fieldNames;
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "",
     libraries,
@@ -32,12 +32,17 @@ const AddressAutocomplete = ({ form, name = "streetAddress", fieldNames = {} }) 
       place.address_components.find((component) =>
         component.types.includes("postal_code")
       )?.long_name || "";
+    const countryValue =
+      place.address_components.find((component) =>
+        component.types.includes("country")
+      )?.long_name || "";
 
     setInputValue(address);
     form.setFieldValue(name, address);
     form.setFieldValue(city, cityValue);
     form.setFieldValue(state, stateValue);
     form.setFieldValue(postalCode, postalCodeValue.replace(" ", ""));
+    form.setFieldValue(country, countryValue);
   };
 
   if (!isLoaded) return <p>Loading...</p>;
@@ -48,7 +53,6 @@ const AddressAutocomplete = ({ form, name = "streetAddress", fieldNames = {} }) 
       onPlaceChanged={handlePlaceSelect}
       options={{
         types: ["address"],
-        componentRestrictions: { country: ["us"] },
       }}
     >
       <input

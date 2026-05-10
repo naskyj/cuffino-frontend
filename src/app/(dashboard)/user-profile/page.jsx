@@ -9,17 +9,34 @@ import Button from "@/components/button";
 import { toast } from "sonner";
 import useAuth from "@/core/zustand/auth.store";
 import { UserServices } from "@/services/user";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 const validationSchema = Yup.object({
   username: Yup.string().required("Username is required"),
-  address: Yup.string().required("Address is required"),
+  address: Yup.string(),
   phoneNumber: Yup.string(),
 });
 
 export default function UserProfile() {
   const [profileImage, setProfileImage] = useState(null);
   const { user, setUser } = useAuth();
+
+  // Fetch delivery addresses to show in profile
+  const { data: addressData } = useQuery({
+    queryKey: ["addresses", user?.userId],
+    queryFn: async () => {
+      const res = await UserServices.getUsersAddresses(user?.userId);
+      return res?.data || [];
+    },
+    enabled: !!user?.userId,
+  });
+
+  const defaultAddress = addressData?.find((a) => a?.isDefault) || addressData?.[0] || null;
+  const displayAddress = defaultAddress
+    ? [defaultAddress.streetAddress, defaultAddress.city, defaultAddress.state, defaultAddress.country]
+        .filter(Boolean)
+        .join(", ")
+    : user?.userDetail?.address || null;
 
   const initialValues = {
     username: user?.username || "",
@@ -150,7 +167,7 @@ export default function UserProfile() {
               <div>
                 <p className="text-xs text-gray-500">Address</p>
                 <p className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
-                  {user?.userDetail?.address || "Not provided"}
+                  {displayAddress || "Not provided"}
                 </p>
               </div>
             </div>

@@ -160,15 +160,13 @@ export default function Login() {
                         <div className="font-light -translate-y-2">
                           <p className="text-sm ">
                             Don't have an account yet?{" "}
-                            <span>
-                              <Link
-                                href="/signup"
-                                className="text-primary underline"
-                              >
-                                Sign Up
-                              </Link>
-                            </span>
                           </p>
+                          <Link
+                            href="/signup"
+                            className="block text-center mt-2 text-base font-semibold text-white bg-primary py-2 px-6 rounded-lg hover:bg-opacity-90 transition-colors"
+                          >
+                            Create an Account
+                          </Link>
                         </div>
 
                         {errorMessage && <TextError>{errorMessage}</TextError>}

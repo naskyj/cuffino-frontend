@@ -129,6 +129,14 @@ const ImageCustomizationModal = ({ isVisible, onClose, onUploaded, currentImageC
                 <p className="text-sm md:text-sm pb-2 font-semibold">
                   Upload Image <span className="text-red-600">*</span>
                 </p>
+                <div className="mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+                  <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs text-blue-700">
+                    <span className="font-semibold">Max size: 5MB</span> &nbsp;|&nbsp; Accepted: JPG, PNG, GIF, WebP
+                  </p>
+                </div>
                 <FormikControl 
                   control="dropzone" 
                   name="file" 

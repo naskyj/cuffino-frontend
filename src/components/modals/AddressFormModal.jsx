@@ -60,7 +60,8 @@ export default function AddressFormModal({
                 fieldNames={{
                   city: "city",
                   state: "state",
-                  postalCode: "postalCode"
+                  postalCode: "postalCode",
+                  country: "country",
                 }}
               />
 

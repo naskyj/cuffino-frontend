@@ -34,16 +34,37 @@ export default function Signup() {
   const initialValues = {
     username: "",
     email: "",
+    phoneNumber: "",
     password: "",
     confirmPassword: "",
     // acceptTerms: false,
   };
 
   const validationSchema = Yup.object({
-    username: Yup.string().required("Please enter your name"),
+    username: Yup.string()
+      .required("Please enter your username")
+      .test(
+        "not-email",
+        "Username cannot be an email address",
+        (value) => {
+          if (!value) return true;
+          return !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+        }
+      ),
     email: Yup.string()
       .email("Invalid email format")
-      .required("Please enter your email"),
+      .required("Please enter your email")
+      .test(
+        "not-same-as-username",
+        "Email must be different from username",
+        function (value) {
+          return value?.toLowerCase() !== this.parent.username?.toLowerCase();
+        }
+      ),
+    phoneNumber: Yup.string().matches(
+      /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{4,10}$/,
+      "Please enter a valid phone number"
+    ),
     password: Yup.string()
       .required("Please enter your password")
       .matches(
@@ -140,6 +161,21 @@ export default function Signup() {
                             label=""
                             name="email"
                             placeholder=""
+                            className=" !w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <p className="text-base md:text-lg pb-1 font-normal">
+                            Phone Number:{" "}
+                            <span className="text-gray-400 text-sm font-light">(optional)</span>
+                          </p>
+                          <FormikControl
+                            control="input"
+                            type="tel"
+                            label=""
+                            name="phoneNumber"
+                            placeholder="+1 234 567 8900"
                             className=" !w-full"
                           />
                         </div>
