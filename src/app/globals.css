@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* i used it in the login page and signup page */
+.hero-bg-position {
+  background-position-y: 30px;
+} 
+
+
+
+
+
+        /* ANT DESIGN */
+/* ------------------------------------------------------------------------------ */
+
+/* make the background in the dropdown menu orange on active and hover */
+.ant-dropdown-menu-submenu-active,
+.ant-dropdown-menu-submenu-open {
+  background-color: #A86746 !important;
+}
+
+/* make the text in the dropdown menu white on active and hover */
+.ant-dropdown-menu-submenu-title:hover .ant-dropdown-menu-title-content,
+.ant-dropdown-menu-submenu-active .ant-dropdown-menu-title-content  {
+  color: white !important;
+}
+
+/* make the arrow in the dropdown menu white on active and hover */
+.ant-dropdown-menu-submenu-title:hover .ant-dropdown-menu-submenu-arrow-icon,
+.ant-dropdown-menu-submenu-active .ant-dropdown-menu-submenu-arrow-icon {
+  color: white !important;
+}
+
+/* removing the right arrow icons totally */
+/* .ant-dropdown-menu-submenu .ant-dropdown-menu-submenu-arrow {
+  display: none !important;
+} */
+
+/* make the background in the dropdown SUBMENU orange on active and hover */
+.ant-dropdown-menu-item-active {
+     background-color: #A86746 !important;
+}
+
+/* make the text in the dropdown SUBMENU white on active and hover */
+.ant-dropdown-menu-item-active, .ant-dropdown-menu-title-content:hover {
+    color: white !important;
+}
+
+/* add width to the dropdown menu */
+.ant-dropdown-menu {
+    width: 200px;
+}
+
+/* add padding to the dropdown menu targeting the li tags */
+.ant-dropdown-menu .ant-dropdown-menu-submenu{
+    padding: 5px;
+}
+.ant-dropdown-menu-sub {
+  margin-left: 12px !important ;
+}
+
+
+
+/* REACT MULTI CAROUSEL STYLING */
+/* ----------------------------------------------------------------------------------- */
+
+.react-multi-carousel-dot--active button {
+  background-color: #A86746!important;
+}
+.react-multi-carousel-dot button {
+  border: none !important;
+  outline: none !important;
+  background-color: #EAE1E1;
+}
+
+
+/* ------------------------------------------------------------------------------------- */
+
+
+
+
+.linearGradientBackground {
+    background: linear-gradient(to right, #F8F8F8, #F5F5F5); /* Apply gradient */
+}
+
+
+/* for ios devices */
+.scrollable-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Fix iOS Safari modal scroll — scroll must be on .ant-modal-body, not .ant-modal */
+.ant-modal .ant-modal-content {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ant-modal .ant-modal-content .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
