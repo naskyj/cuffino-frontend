@@ -111,6 +111,8 @@ export default function Signup() {
                 <Formik
                   initialValues={initialValues}
                   validationSchema={validationSchema}
+                  validateOnChange={false}
+                  validateOnBlur={true}
                   onSubmit={(values) => mutation.mutate(values)}
                 >
                   {(formik) => {
@@ -201,7 +203,7 @@ export default function Signup() {
                             <Button
                               className="bg-[#A86746] text-white rounded-lg !text-base min-w-[290px] lg:!min-w-[600px]"
                               type="submit"
-                              disable={mutation.isLoading || !formik.isValid}
+                              disable={mutation.isLoading}
                               loading={mutation.isLoading}
                             >
                               {formik.isSubmitting ? "Register" : "Register"}

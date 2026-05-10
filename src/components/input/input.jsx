@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ErrorMessage, Field } from "formik";
+import { ErrorMessage, FastField } from "formik";
 import { FaRegEyeSlash } from "react-icons/fa";
 import { IoEyeOutline } from "react-icons/io5";
 import { TextError } from "../utils";
@@ -60,10 +60,10 @@ const Input = ({
           </label>
         )}
         <div className="relative">
-          <Field
+          <FastField
             disabled={disabled}
             className={`
-              "w-full py-[2px] px-2 rounded-[3px] placeholder:text-xs placeholder:text-[#B9B9B9] text-[14px]  bg-placeholder border border-[#DCDFF1] focus:outline-none  relative font-light min-h-[44px] focus:shadow-[0_0_3px_#E6ECF7] max-h-[44px] pr-[42px] disabled:cursor-not-allowed",
+              w-full py-[2px] px-2 rounded-[3px] placeholder:text-xs placeholder:text-[#B9B9B9] text-[14px] bg-placeholder border border-[#DCDFF1] focus:outline-none relative font-light min-h-[44px] focus:shadow-[0_0_3px_#E6ECF7] max-h-[44px] pr-[42px] disabled:cursor-not-allowed
               ${className}
             `}
             type={type === "password" ? inputType : type}
