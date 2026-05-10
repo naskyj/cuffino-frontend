@@ -19,7 +19,6 @@ import { toast } from "sonner";
 import { Playfair_Display } from "next/font/google";
 import DesktopNavbar from "@/components/navbars/desktopNavbar";
 import MobileNavbar from "@/components/navbars/mobileNavabr";
-import AutoComplete from "@/components/input/AutoComplete";
 
 const playFair = Playfair_Display({
   subsets: ["latin"],
@@ -37,7 +36,6 @@ export default function Signup() {
     email: "",
     password: "",
     confirmPassword: "",
-    address: "",
     // acceptTerms: false,
   };
 
@@ -55,7 +53,6 @@ export default function Signup() {
     confirmPassword: Yup.string()
       .required("Please confirm your password")
       .oneOf([Yup.ref("password")], "Passwords must match"),
-    address: Yup.string().required("Please enter your address"),
 
     // acceptTerms: Yup.bool().oneOf(
     //   [true],
@@ -145,13 +142,6 @@ export default function Signup() {
                             placeholder=""
                             className=" !w-full"
                           />
-                        </div>
-
-                        <div>
-                          <p className="text-base md:text-lg pb-1 font-normal">
-                            Address: <span className="text-red-500">*</span>
-                          </p>
-                         <AutoComplete form={formik} name="address" />
                         </div>
 
                         <div>
