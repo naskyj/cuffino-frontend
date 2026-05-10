@@ -2,7 +2,9 @@ import axios from "axios";
 import useAuth from "@/core/zustand/auth.store";
 
 // Retrieve the base url from environment variables or set a default
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const baseURL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://cuffino-backend-production.up.railway.app/cuffino/api/v1";
 
 // Create an Axios instance with a base URL and default headers
 const axiosInstance = axios.create({
