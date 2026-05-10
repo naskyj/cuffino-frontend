@@ -59,6 +59,89 @@ const validationSchema = Yup.object({
   calf: measurementField("calf", "Calf"),
 });
 
+const MEASUREMENT_HELP = {
+  height: {
+    text: "Stand straight without shoes and measure from floor to top of head.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  bust: {
+    text: "Wrap tape around the fullest part of your chest/bust, level all around.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  waist: {
+    text: "Measure around the narrowest part of your torso, keeping tape snug but not tight.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  shoulderWidth: {
+    text: "Measure from one shoulder point to the other across your upper back.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  neck: {
+    text: "Measure around the base of your neck where a collar would sit.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  armLength: {
+    text: "Measure from shoulder point down to wrist with arm relaxed.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  sleeveLength: {
+    text: "Measure from shoulder seam to desired cuff end.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  hips: {
+    text: "Measure around the fullest part of your hips and seat.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  legLength: {
+    text: "Measure from waist/hip line down to your desired garment hem length.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  inseam: {
+    text: "Measure from crotch to ankle along the inner leg seam.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  thigh: {
+    text: "Measure around the fullest part of your upper thigh.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  calf: {
+    text: "Measure around the fullest part of your calf.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+};
+
+const MeasurementLabel = ({ label, helpKey }) => {
+  const help = MEASUREMENT_HELP[helpKey];
+
+  if (!help) {
+    return label;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span>{label}</span>
+      <span className="relative group inline-flex items-center">
+        <span
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] text-gray-600 bg-white cursor-help"
+          title={help.text}
+        >
+          ?
+        </span>
+        <span className="pointer-events-none absolute left-0 top-6 z-20 hidden w-64 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700 shadow-lg group-hover:block">
+          {help.image && (
+            <img
+              src={help.image}
+              alt="Measurement guide"
+              className="mb-2 h-20 w-full rounded object-contain bg-gray-50"
+            />
+          )}
+          {help.text}
+        </span>
+      </span>
+    </span>
+  );
+};
+
 // Measurement stat display component
 const MeasurementStat = ({ label, value }) => (
   <div className="bg-gray-50 rounded-lg p-3 text-center">
@@ -190,30 +273,6 @@ export default function UserMeasurement() {
 
   return (
     <div className="space-y-6">
-      {/* Measurement Guide */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
-          📏 How to Measure — Quick Guide (all measurements in inches)
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-amber-900">
-          <div><strong>Neck:</strong> Around the base of your neck.</div>
-          <div><strong>Bust/Chest:</strong> Around the fullest part of your chest.</div>
-          <div><strong>Waist:</strong> Around the narrowest part of your torso.</div>
-          <div><strong>Hips:</strong> Around the fullest part of your hips.</div>
-          <div><strong>Shoulder Width:</strong> From shoulder point to shoulder point across the back.</div>
-          <div><strong>Arm Length:</strong> From shoulder point to wrist.</div>
-          <div><strong>Sleeve Length:</strong> From shoulder seam to desired cuff end.</div>
-          <div><strong>Leg Length:</strong> From waist/hip to desired hem length.</div>
-          <div><strong>Inseam:</strong> From crotch to ankle along inner leg.</div>
-          <div><strong>Thigh:</strong> Around the fullest part of the upper thigh.</div>
-          <div><strong>Calf:</strong> Around the fullest part of the lower leg.</div>
-          <div><strong>Height:</strong> Standing straight from floor to top of head.</div>
-        </div>
-        <p className="text-xs text-amber-700 mt-3 italic">
-          Tip: Measure over thin clothing and keep the tape firm but not tight.
-        </p>
-      </div>
-
       {/* Add New Measurement Form */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         {/* Header */}
@@ -265,7 +324,7 @@ export default function UserMeasurement() {
                     <FormikControl
                       control="input"
                       type="number"
-                      label="Height (inches)"
+                      label={<MeasurementLabel label="Height (inches)" helpKey="height" />}
                       name="height"
                       placeholder="Optional unless children"
                       className="w-full"
@@ -286,12 +345,12 @@ export default function UserMeasurement() {
                     Upper Body
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <FormikControl control="input" type="text" label={formik.values.bodyType === "MEN" || formik.values.bodyType === "CHILDREN" ? "Chest" : "Bust"} name="bust" placeholder="Bust or chest measurement" className="w-full" />
-                    <FormikControl control="input" type="text" label="Waist" name="waist" placeholder="Waist measurement" required className="w-full" />
-                    <FormikControl control="input" type="text" label="Shoulder Width" name="shoulderWidth" placeholder="Shoulder width" required className="w-full" />
-                    <FormikControl control="input" type="text" label="Neck" name="neck" placeholder="Neck measurement" required className="w-full" />
-                    <FormikControl control="input" type="text" label="Arm Length" name="armLength" placeholder="Arm length" required className="w-full" />
-                    <FormikControl control="input" type="text" label="Sleeve Length" name="sleeveLength" placeholder="Sleeve length" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label={formik.values.bodyType === "MEN" || formik.values.bodyType === "CHILDREN" ? "Chest" : "Bust"} helpKey="bust" />} name="bust" placeholder="Bust or chest measurement" className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Waist" helpKey="waist" />} name="waist" placeholder="Waist measurement" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Shoulder Width" helpKey="shoulderWidth" />} name="shoulderWidth" placeholder="Shoulder width" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Neck" helpKey="neck" />} name="neck" placeholder="Neck measurement" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Arm Length" helpKey="armLength" />} name="armLength" placeholder="Arm length" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Sleeve Length" helpKey="sleeveLength" />} name="sleeveLength" placeholder="Sleeve length" required className="w-full" />
                   </div>
                 </div>
 
@@ -302,11 +361,11 @@ export default function UserMeasurement() {
                     Lower Body
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <FormikControl control="input" type="text" label="Hips" name="hips" placeholder="Hips measurement" required className="w-full" />
-                    <FormikControl control="input" type="text" label={formik.values.bodyType === "WOMEN" ? "Dress Length" : formik.values.bodyType === "CHILDREN" ? "Garment Length" : "Leg Length"} name="legLength" placeholder="Leg or garment length" required className="w-full" />
-                    <FormikControl control="input" type="text" label="Inseam" name="inseam" placeholder="Inseam measurement" required className="w-full" />
-                    <FormikControl control="input" type="text" label="Thigh" name="thigh" placeholder="Thigh measurement" required className="w-full" />
-                    <FormikControl control="input" type="text" label="Calf" name="calf" placeholder="Calf measurement" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Hips" helpKey="hips" />} name="hips" placeholder="Hips measurement" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label={formik.values.bodyType === "WOMEN" ? "Dress Length" : formik.values.bodyType === "CHILDREN" ? "Garment Length" : "Leg Length"} helpKey="legLength" />} name="legLength" placeholder="Leg or garment length" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Inseam" helpKey="inseam" />} name="inseam" placeholder="Inseam measurement" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Thigh" helpKey="thigh" />} name="thigh" placeholder="Thigh measurement" required className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Calf" helpKey="calf" />} name="calf" placeholder="Calf measurement" required className="w-full" />
                   </div>
                 </div>
 

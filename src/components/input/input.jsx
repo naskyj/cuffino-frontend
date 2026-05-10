@@ -53,7 +53,7 @@ const Input = ({
           <label
             htmlFor={name}
             className={
-              `sharp-sans text-[14px] font-[600] pointer-events-none, max-w-[75%]`
+              `sharp-sans text-[14px] font-[600] max-w-[75%]`
             }
           >
             {label}
