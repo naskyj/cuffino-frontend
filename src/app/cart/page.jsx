@@ -35,7 +35,6 @@ const CartPage = () => {
   const [shippingCost, setShippingCost] = useState(null);
   const [totalDiscount, setTotalDiscount] = useState(null);
   const [createOrderLoader, setCreateOrderLoader] = useState(false);
-  const [currentOrderId, setCurrentOrderId] = useState(null);
   const [customizationImages, setCustomizationImages] = useState([]);
   const [
     isViewCustomizationsModalVisible,
@@ -84,7 +83,6 @@ const CartPage = () => {
       toast.success(variables?.successMessage || "Cart updated");
       // Refetch cart data after successful update
       queryClient.invalidateQueries({ queryKey: ["getCart", user?.userId] });
-      createOrder();
     },
     onError: (error, variables) => {
       toast.error(variables?.errorMessage || "Failed to update cart");
@@ -179,7 +177,6 @@ const CartPage = () => {
       const responseII = await OrdersServices.createOrder(response?.data); //create Order
       const createdOrderId = responseII?.data?.orderId;
 
-      setCurrentOrderId(createdOrderId);
       setTotalAmount(responseII?.data?.totalAmount);
       setCreateOrderLoader(false); //stops loader, enables the checkout button
       setOrderId(createdOrderId); //order id is stored in zustand, what i use for other pages
@@ -196,16 +193,6 @@ const CartPage = () => {
       setCreateOrderLoader(false);
     }
   };
-
-  const getOrder = useQuery({
-    queryKey: ["getOrders", currentOrderId],
-    queryFn: async () => {
-      // if (!getCart?.data?.cartId) return;
-      const response = await OrdersServices.getOrder(currentOrderId);
-      return response?.data;
-    },
-    enabled: !!currentOrderId,
-  });
 
   // const initiatePayment = useMutation({
   //   mutationFn: async () => {
@@ -233,26 +220,13 @@ const CartPage = () => {
   // });
 
   useEffect(() => {
-    createOrder();
-  }, [getCart?.data?.cartId]);
-
-  // Update state when order data is available
-  useEffect(() => {
-    if (getOrder?.data) {
-      setTaxAmount(getOrder?.data?.tax);
-      setShippingCost(getOrder?.data?.shippingFee);
-      setTotalDiscount(getOrder?.data?.discountTotal);
-      setTotalAmount(getOrder?.data?.totalPrice);
-    }
-  }, [getOrder?.data]);
-
-  useEffect(() => {
-    if (getCart?.isSuccess && !getOrder?.data) {
+    if (getCart?.isSuccess) {
       setTotalAmount(cartSubTotal);
       if (taxAmount === null) setTaxAmount(0);
       if (totalDiscount === null) setTotalDiscount(0);
+      if (shippingCost === null) setShippingCost(0);
     }
-  }, [getCart?.isSuccess, getOrder?.data, cartSubTotal, taxAmount, totalDiscount]);
+  }, [getCart?.isSuccess, cartSubTotal, taxAmount, totalDiscount, shippingCost]);
 
   // const cartItems = getCart?.
   // const handleCheckout = async () => {
@@ -319,10 +293,8 @@ const CartPage = () => {
       return;
     }
 
-    let nextOrderId = currentOrderId;
-    if (!nextOrderId) {
-      nextOrderId = await createOrder();
-    }
+    // Standard flow: create order only when user proceeds to checkout.
+    const nextOrderId = await createOrder();
 
     if (!nextOrderId) {
       toast.error("Unable to prepare order. Please try again.");
@@ -468,15 +440,6 @@ const CartPage = () => {
             Continue shopping
           </Link>
         </div> */}
-
-          {/* Warning Message */}
-          <div className="border-2 border-amber-500 bg-amber-50 mx-4 md:mx-0 p-4 mb-8 rounded-md">
-            <p className="text-amber-700 text-sm">
-              Kindly note that production timeline would be X -Y working days.
-              Ensure accurate size/ measurement have been provided on selected
-              order. If unsure of sizing, please refer to Sizing Chart.
-            </p>
-          </div>
 
           {/* Cart Items */}
           <div className="bg-white rounded-lg shadow-sm border mb-8">

@@ -157,15 +157,21 @@ export default function Login() {
                             className=" !w-full"
                           />
                         </div>
-                        <div className="font-light -translate-y-2">
-                          <p className="text-sm ">
-                            Don't have an account yet?{" "}
+                        <div className="font-light -translate-y-1 flex items-center justify-between">
+                          <p className="text-sm">
+                            Don&apos;t have an account yet?{" "}
+                            <Link
+                              href="/signup"
+                              className="text-primary underline text-base font-semibold hover:text-[#8f563a]"
+                            >
+                              Create an Account
+                            </Link>
                           </p>
                           <Link
-                            href="/signup"
-                            className="block text-center mt-2 text-base font-semibold text-white bg-primary py-2 px-6 rounded-lg hover:bg-opacity-90 transition-colors"
+                            href="/forgot-password"
+                            className="text-sm text-primary underline hover:text-[#8f563a]"
                           >
-                            Create an Account
+                            Forgot Password?
                           </Link>
                         </div>
 
