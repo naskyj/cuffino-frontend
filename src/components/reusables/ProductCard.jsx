@@ -26,8 +26,16 @@ const ProductCard = ({ product, utilityClassName }) => {
         </Link>
       </div>
       <div className="flex flex-col pt-3">
-        <p className="text-lg font-semibold">{name}</p>
-        <p className="text-sm font-medium">${price}</p>
+        <Link href={`/products/${prdId}`} className="w-fit">
+          <p className="text-lg font-semibold hover:text-primary transition-colors">
+            {name}
+          </p>
+        </Link>
+        <Link href={`/products/${prdId}`} className="w-fit">
+          <p className="text-sm font-medium hover:text-primary transition-colors">
+            ${price}
+          </p>
+        </Link>
       </div>
     </div>
   );
