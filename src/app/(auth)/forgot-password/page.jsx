@@ -1,112 +1,127 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { Form, Formik } from "formik";
+import * as Yup from "yup";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 
-// import BackToHome from "../../../components/back-to-home";
-// import Switcher from "../../../components/switcher";
+import FormikControl from "@/components/formik/formikControl";
+import { TextError } from "@/components/utils";
+import Button from "@/components/button";
+import BackToHome from "@/components/helpers/back-to-home";
+import DesktopNavbar from "@/components/navbars/desktopNavbar";
+import MobileNavbar from "@/components/navbars/mobileNavabr";
+import { AuthServices } from "@/services/auth";
+
+const validationSchema = Yup.object({
+  email: Yup.string().email("Invalid email format").required("Please enter your email"),
+});
 
 export default function ForgotPassword() {
+  const mutation = useMutation({
+    mutationFn: async (values) => {
+      const response = await AuthServices.send_password_otp({ email: values.email });
+      return response?.data;
+    },
+    onSuccess: () => {
+      toast.success("Verification code sent to your email");
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message ?? "Failed to send reset code");
+    },
+  });
+
   return (
     <>
-      <section className="md:h-screen py-36 flex items-center bg-[#3A2D28]/10 dark:bg-[#3A2D28]/20 bg-[url('/images/hero/bg-shape.png')] bg-center bg-no-repeat bg-cover">
-        <div className="container relative">
-          <div className="grid grid-cols-1">
-            <div className="relative overflow-hidden rounded-md shadow dark:shadow-gray-700 bg-white dark:bg-slate-900">
-              <div className="grid md:grid-cols-2 grid-cols-1 items-center">
-                <div className="relative md:shrink-0">
-                  <Image
-                    src="/images/forgot-password.jpg"
-                    width={0}
-                    height={0}
-                    sizes="100vw"
-                    style={{ width: "100%", height: "auto" }}
-                    className="lg:h-full h-full w-full object-cover md:h-[34rem]"
-                    alt=""
-                  />
-                </div>
+      <div className="bg-primary min-h-screen bg-center bg-no-repeat bg-cover">
+        <div className="pb-12">
+          <div className="xl:px-[100px]">
+            <DesktopNavbar
+              textColor={`!text-white`}
+              isLogoBlack={false}
+              isAuthPage={true}
+            />
+          </div>
+          <MobileNavbar
+            utilityClassName="px-6 md:px-9 lg:px-[100px] text-white"
+            isAuthPage={true}
+            isLogoBlack={false}
+          />
+        </div>
 
-                <div className="p-8 lg:px-20">
-                  <div className="text-center">
-                    <Link href="/">
-                      <Image
-                        src="/images/cufinoLogo2.png"
-                        width={114}
-                        height={22}
-                        className="mx-auto block dark:hidden"
-                        alt=""
-                      />
-                      <Image
-                        src="/images/cufinoLogo1.png"
-                        width={114}
-                        height={22}
-                        className="mx-auto hidden dark:block"
-                        alt=""
-                      />
-                    </Link>
-                  </div>
-
-                  <form className="text-start lg:py-20 py-8">
-                    <p className="text-slate-400 mb-6">
-                      Please enter your email address. You will receive a link
-                      to create a new password via email.
-                    </p>
-                    <div className="grid grid-cols-1">
-                      <div className="mb-4">
-                        <label className="font-semibold" htmlFor="LoginEmail">
-                          Email Address:
-                        </label>
-                        <input
-                          id="LoginEmail"
-                          type="email"
-                          className="mt-3 w-full py-2 px-3 h-10 bg-transparent dark:bg-slate-900 dark:text-slate-200 rounded outline-none border border-gray-100 dark:border-gray-800 focus:ring-0"
-                          placeholder="name@example.com"
-                        />
-                      </div>
-
-                      <div className="mb-4">
-                        <input
-                          type="submit"
-                          className="py-2 px-5 inline-block tracking-wide align-middle duration-500 text-base text-center bg-[#3A2D28] text-white rounded-md w-full"
-                          value="Send"
-                        />
-                      </div>
-
-                      <div className="text-center">
-                        <span className="text-slate-400 me-2">
-                          Remember your password ?{" "}
-                        </span>
-                        <Link
-                          href="/auth/login"
-                          className="text-black dark:text-white font-bold inline-block"
-                        >
-                          Sign in
-                        </Link>
-                      </div>
-                    </div>
-                  </form>
-
-                  <div className="text-center">
-                    <p className="mb-0 text-slate-400">
-                      © {new Date().getFullYear()} Cufino. Design & Develop with{" "}
-                      <i className="mdi mdi-heart text-red-600"></i> by{" "}
-                      <Link
-                        href="https://shreethemes.in/"
-                        target="_blank"
-                        className="text-reset"
-                      >
-                        Shreethemes
-                      </Link>
-                      .
-                    </p>
-                  </div>
-                </div>
+        <section className="pt-9 pb-36 flex items-center justify-center">
+          <div className="flex items-center justify-center bg-auth-bg bg-center bg-no-repeat rounded-[14px] shadow bg-white w-full mx-4 md:mx-12 lg:mx-[250px]">
+            <div className="w-full px-5 md:px-8 py-[70px] lg:px-20">
+              <div className="text-primary text-center text-3xl pb-10">
+                Forgot Password
               </div>
+
+              <Formik
+                initialValues={{ email: "" }}
+                validationSchema={validationSchema}
+                validateOnChange={false}
+                validateOnBlur={true}
+                onSubmit={(values) => mutation.mutate(values)}
+              >
+                {() => (
+                  <Form className="space-y-[20px]">
+                    <p className="text-gray-600 text-sm md:text-base">
+                      Please enter your email address. We will send a verification code to reset your password.
+                    </p>
+
+                    <div>
+                      <p className="text-base md:text-lg pb-1 font-normal">
+                        Email Address: <span className="text-red-500">*</span>
+                      </p>
+                      <FormikControl
+                        control="input"
+                        type="email"
+                        label=""
+                        name="email"
+                        placeholder="Enter your account email"
+                        className="!w-full"
+                      />
+                    </div>
+
+                    <div className="flex justify-center pt-6">
+                      <Button
+                        className="bg-[#A86746] text-white rounded-lg !text-base min-w-[290px] lg:!min-w-[600px]"
+                        type="submit"
+                        disable={mutation.isPending}
+                        loading={mutation.isPending}
+                      >
+                        Send
+                      </Button>
+                    </div>
+
+                    <div className="font-light -translate-y-1 text-center">
+                      <p className="text-sm">
+                        Remember your password?{" "}
+                        <Link
+                          href="/login"
+                          className="text-primary underline text-base font-semibold hover:text-[#8f563a]"
+                        >
+                          Sign In
+                        </Link>
+                      </p>
+                    </div>
+
+                    {mutation.isError && (
+                      <TextError>
+                        {mutation.error?.response?.data?.message ?? "An unexpected error occurred"}
+                      </TextError>
+                    )}
+                  </Form>
+                )}
+              </Formik>
             </div>
           </div>
-        </div>
-      </section>
-      {/* <BackToHome />
-      <Switcher /> */}
+        </section>
+      </div>
+
+      <BackToHome />
     </>
   );
 }
