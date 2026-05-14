@@ -14,6 +14,7 @@ import { ClipLoader } from "react-spinners";
 import CustomSelect from "../select";
 import { ProductServices } from "@/services/product";
 import CustomModal from "./index";
+import AiMeasurementAssistant from "@/components/ai/AiMeasurementAssistant";
 
 const BODY_TYPE_OPTIONS = [
   { key: "Select body type", value: "" },
@@ -474,6 +475,25 @@ const MeasurementFormModal = ({
               {(formik) => {
                 return (
                   <Form className="space-y-[20px]">
+                    <AiMeasurementAssistant
+                      onApply={({ measurements, aiNote }) => {
+                        Object.entries(measurements).forEach(([field, value]) => {
+                          if (value !== null && value !== undefined) {
+                            formik.setFieldValue(field, value.toString());
+                          }
+                        });
+
+                        if (!formik.values.additionalNotes?.includes("AI estimate")) {
+                          formik.setFieldValue(
+                            "additionalNotes",
+                            formik.values.additionalNotes
+                              ? `${formik.values.additionalNotes}\n${aiNote}`
+                              : aiNote
+                          );
+                        }
+                      }}
+                    />
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-8">
                       <div>
                         <p className="text-sm md:text-sm pb-1 font-semibold">

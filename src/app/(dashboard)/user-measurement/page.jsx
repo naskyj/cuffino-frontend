@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import useAuth from "@/core/zustand/auth.store";
 import { UserServices } from "@/services/user";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import AiMeasurementAssistant from "@/components/ai/AiMeasurementAssistant";
 
 const BODY_TYPE_OPTIONS = [
   { key: "Select body type", value: "" },
@@ -300,6 +301,25 @@ export default function UserMeasurement() {
           >
             {(formik) => (
               <Form className="space-y-6">
+                <AiMeasurementAssistant
+                  onApply={({ measurements, aiNote }) => {
+                    Object.entries(measurements).forEach(([field, value]) => {
+                      if (value !== null && value !== undefined) {
+                        formik.setFieldValue(field, value.toString());
+                      }
+                    });
+
+                    if (!formik.values.additionalNotes?.includes("AI estimate")) {
+                      formik.setFieldValue(
+                        "additionalNotes",
+                        formik.values.additionalNotes
+                          ? `${formik.values.additionalNotes}\n${aiNote}`
+                          : aiNote
+                      );
+                    }
+                  }}
+                />
+
                 {/* Profile Name */}
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
