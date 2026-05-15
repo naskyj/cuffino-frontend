@@ -98,12 +98,8 @@ export default function AiMeasurementAssistant({ onApply }) {
   }, [isCameraActive, isStartingCamera]);
 
   const canEstimate = useMemo(() => {
-    if (!imagePreviewUrl) return false;
-    if (calibrationMode === "height") {
-      return Number(heightInches) > 0;
-    }
-    return Number(markerWidthInches) > 0 && Number(markerPixelWidth) > 1;
-  }, [imagePreviewUrl, calibrationMode, heightInches, markerWidthInches, markerPixelWidth]);
+    return Boolean(imagePreviewUrl);
+  }, [imagePreviewUrl]);
 
   const handleEstimate = async () => {
     if (!imagePreviewUrl) {
