@@ -66,12 +66,36 @@ export default function AiMeasurementAssistant({ onApply }) {
     setIsAutoCapturing(false);
   };
 
+  const attachStreamToVideo = async () => {
+    if (!videoRef.current || !streamRef.current) {
+      return;
+    }
+
+    if (videoRef.current.srcObject !== streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+
+    try {
+      await videoRef.current.play();
+    } catch {
+      // Some browsers may delay autoplay until metadata is ready.
+    }
+  };
+
   useEffect(() => {
     return () => {
       revokeCurrentPreview();
       stopCamera();
     };
   }, [imagePreviewUrl]);
+
+  useEffect(() => {
+    if (!isCameraActive && !isStartingCamera) {
+      return;
+    }
+
+    attachStreamToVideo();
+  }, [isCameraActive, isStartingCamera]);
 
   const canEstimate = useMemo(() => {
     if (!imagePreviewUrl) return false;
@@ -147,13 +171,8 @@ export default function AiMeasurementAssistant({ onApply }) {
 
       stopCamera();
       streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-
       setIsCameraActive(true);
+      await attachStreamToVideo();
       toast.success("Webcam is ready. Position full body in frame.");
     } catch (error) {
       toast.error(
@@ -348,7 +367,7 @@ export default function AiMeasurementAssistant({ onApply }) {
           )}
         </div>
 
-        {isCameraActive && (
+        {(isCameraActive || isStartingCamera) && (
           <div className="pt-3">
             <video
               ref={videoRef}
@@ -357,6 +376,9 @@ export default function AiMeasurementAssistant({ onApply }) {
               muted
               className="h-56 w-full rounded-md border border-gray-200 object-contain bg-black"
             />
+            {isStartingCamera && (
+              <p className="pt-2 text-xs text-gray-600">Starting webcam...</p>
+            )}
             <p className="pt-2 text-xs text-gray-600">
               Keep your full body visible in the frame for better measurement accuracy.
             </p>
