@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import Button from "@/components/button";
 import { estimateMeasurementsWithMoveNet } from "@/lib/ai/movenetEstimator";
@@ -33,12 +33,43 @@ export default function AiMeasurementAssistant({ onApply }) {
   const [markerPixelWidth, setMarkerPixelWidth] = useState("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [isEstimating, setIsEstimating] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
+  const [isAutoCapturing, setIsAutoCapturing] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const autoCaptureTimeoutRef = useRef(null);
+
+  const revokeCurrentPreview = () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+  };
+
+  const stopCamera = () => {
+    if (autoCaptureTimeoutRef.current) {
+      clearTimeout(autoCaptureTimeoutRef.current);
+      autoCaptureTimeoutRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setIsCameraActive(false);
+    setIsAutoCapturing(false);
+  };
 
   useEffect(() => {
     return () => {
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
+      revokeCurrentPreview();
+      stopCamera();
     };
   }, [imagePreviewUrl]);
 
@@ -52,7 +83,7 @@ export default function AiMeasurementAssistant({ onApply }) {
 
   const handleEstimate = async () => {
     if (!imagePreviewUrl) {
-      toast.error("Please upload a front full-body image first.");
+      toast.error("Please upload or capture a front full-body image first.");
       return;
     }
 
@@ -97,6 +128,101 @@ export default function AiMeasurementAssistant({ onApply }) {
     } finally {
       setIsEstimating(false);
     }
+  };
+
+  const handleStartCamera = async () => {
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      toast.error("Webcam is not supported in this browser.");
+      return;
+    }
+
+    try {
+      setIsStartingCamera(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+        },
+        audio: false,
+      });
+
+      stopCamera();
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      setIsCameraActive(true);
+      toast.success("Webcam is ready. Position full body in frame.");
+    } catch (error) {
+      toast.error(
+        error?.message || "Unable to access webcam. Please allow camera permission."
+      );
+    } finally {
+      setIsStartingCamera(false);
+    }
+  };
+
+  const captureCurrentFrame = () => {
+    if (!videoRef.current || !canvasRef.current) {
+      toast.error("Camera is not ready yet.");
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+
+    if (!width || !height) {
+      toast.error("Unable to capture image. Please try again.");
+      return;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      toast.error("Unable to process captured image.");
+      return;
+    }
+
+    context.drawImage(video, 0, 0, width, height);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          toast.error("Unable to capture image. Please try again.");
+          return;
+        }
+
+        revokeCurrentPreview();
+        setImagePreviewUrl(URL.createObjectURL(blob));
+        stopCamera();
+        toast.success("Photo captured. You can now run AI estimation.");
+      },
+      "image/jpeg",
+      0.92
+    );
+  };
+
+  const handleAutoCapture = () => {
+    if (!isCameraActive) {
+      toast.error("Please start the webcam first.");
+      return;
+    }
+
+    if (autoCaptureTimeoutRef.current) {
+      clearTimeout(autoCaptureTimeoutRef.current);
+    }
+
+    setIsAutoCapturing(true);
+    toast.info("Auto capture in 3 seconds. Hold a full-body pose.");
+    autoCaptureTimeoutRef.current = setTimeout(() => {
+      setIsAutoCapturing(false);
+      captureCurrentFrame();
+      autoCaptureTimeoutRef.current = null;
+    }, 3000);
   };
 
   return (
@@ -175,12 +301,68 @@ export default function AiMeasurementAssistant({ onApply }) {
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (!file) return;
-            if (imagePreviewUrl) {
-              URL.revokeObjectURL(imagePreviewUrl);
-            }
+            revokeCurrentPreview();
             setImagePreviewUrl(URL.createObjectURL(file));
           }}
         />
+
+        <div className="flex flex-wrap gap-2 pt-3">
+          <Button
+            type="button"
+            className="border border-gray-300 bg-white text-gray-700 rounded-md"
+            onClick={handleStartCamera}
+            disable={isStartingCamera}
+            loading={isStartingCamera}
+          >
+            {isCameraActive ? "Restart Webcam" : "Use Webcam"}
+          </Button>
+
+          {isCameraActive && (
+            <>
+              <Button
+                type="button"
+                className="border border-gray-300 bg-white text-gray-700 rounded-md"
+                onClick={captureCurrentFrame}
+                disable={isAutoCapturing}
+              >
+                Capture Now
+              </Button>
+
+              <Button
+                type="button"
+                className="border border-gray-300 bg-white text-gray-700 rounded-md"
+                onClick={handleAutoCapture}
+                disable={isAutoCapturing}
+              >
+                {isAutoCapturing ? "Auto Capture..." : "Auto Capture (3s)"}
+              </Button>
+
+              <Button
+                type="button"
+                className="border border-gray-300 bg-white text-gray-700 rounded-md"
+                onClick={stopCamera}
+              >
+                Stop Webcam
+              </Button>
+            </>
+          )}
+        </div>
+
+        {isCameraActive && (
+          <div className="pt-3">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="h-56 w-full rounded-md border border-gray-200 object-contain bg-black"
+            />
+            <p className="pt-2 text-xs text-gray-600">
+              Keep your full body visible in the frame for better measurement accuracy.
+            </p>
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+        )}
       </div>
 
       {imagePreviewUrl && (
