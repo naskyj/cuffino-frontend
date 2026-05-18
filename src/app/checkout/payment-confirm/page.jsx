@@ -89,20 +89,7 @@ const PaymentConfirmPage = () => {
 
   const orderData = getOrder?.data;
 
-  const computeGrandTotal = (order) => {
-    if (!order) return null;
-    if (order.finalizedTotal !== null && order.finalizedTotal !== undefined) {
-      return Number(order.finalizedTotal);
-    }
-    return (
-      Number(order.totalPrice || 0) +
-      Number(order.tax || 0) +
-      Number(order.shippingFee || 0) -
-      Number(order.discountTotal || 0)
-    );
-  };
-
-  const grandTotal = computeGrandTotal(orderData);
+  const grandTotal = orderData?.grandTotal ?? orderData?.finalizedTotal ?? null;
 
   return (
     <div className="">

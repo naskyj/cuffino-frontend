@@ -162,11 +162,7 @@ export default function UserOrders() {
                   <div className="text-right">
                     <p className="text-lg font-semibold text-gray-900">
                       {formatCurrency(
-                        order.finalizedTotal ??
-                          (Number(order.totalPrice || 0) +
-                            Number(order.tax || 0) +
-                            Number(order.shippingFee || 0) -
-                            Number(order.discountTotal || 0)),
+                        order.grandTotal ?? order.finalizedTotal ?? 0,
                         order.currency
                       )}
                     </p>
@@ -286,16 +282,12 @@ export default function UserOrders() {
                         Grand Total:
                       </span>
                       <span className="text-base md:text-sm text-primary">
-                        {orderDetails.totalPrice === null ||
-                        orderDetails.totalPrice === undefined ? (
+                        {orderDetails.grandTotal === null ||
+                        orderDetails.grandTotal === undefined ? (
                           <div className="h-4 w-12 bg-gray-300 rounded animate-pulse"></div>
                         ) : (
                           formatCurrency(
-                            orderDetails.finalizedTotal ??
-                              (Number(orderDetails.totalPrice || 0) +
-                                Number(orderDetails.tax || 0) +
-                                Number(orderDetails.shippingFee || 0) -
-                                Number(orderDetails.discountTotal || 0)),
+                            orderDetails.grandTotal,
                             orderDetails.currency
                           )
                         )}

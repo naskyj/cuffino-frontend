@@ -140,20 +140,7 @@ const OrderCheckoutPage = () => {
 
   const orderItems = getOrder?.data?.items || [];
 
-  const computeGrandTotal = (order) => {
-    if (!order) return null;
-    if (order.finalizedTotal !== null && order.finalizedTotal !== undefined) {
-      return Number(order.finalizedTotal);
-    }
-    return (
-      Number(order.totalPrice || 0) +
-      Number(order.tax || 0) +
-      Number(order.shippingFee || 0) -
-      Number(order.discountTotal || 0)
-    );
-  };
-
-  const grandTotal = computeGrandTotal(getOrder?.data);
+  const grandTotal = getOrder?.data?.grandTotal ?? getOrder?.data?.finalizedTotal ?? null;
 
   return (
     <div className="">
