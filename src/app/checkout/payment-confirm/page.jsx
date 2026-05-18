@@ -9,7 +9,7 @@ import MobileNavbar from "@/components/navbars/mobileNavabr";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import useAuth from "@/core/zustand/auth.store";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { OrdersServices } from "@/services/orders";
 import useUtility from "@/core/zustand/utility";
 import Button from "@/components/button";
@@ -17,7 +17,8 @@ import Button from "@/components/button";
 const PaymentConfirmPage = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const { orderId, setClientSecret } = useUtility();
+  const { orderId, clientSecret, setClientSecret } = useUtility();
+  const queryClient = useQueryClient();
   const [taxAmount, setTaxAmount] = useState(null);
   const [totalDiscount, setTotalDiscount] = useState(null);
   const [totalAmount, setTotalAmount] = useState(null);
@@ -46,22 +47,17 @@ const PaymentConfirmPage = () => {
   const initiatePayment = useMutation({
     mutationFn: async () => {
       if (!orderId) return;
-      try {
-        const response = await OrdersServices.initiatePayment(orderId, {
-          paymentMethod: "CARD",
-          successUrl: `https://yourapp.com/payment/success?orderId=${orderId}`,
-          cancelUrl: `https://yourapp.com/payment/cancel?orderId=${orderId}`,
-          returnUrl: `https://yourapp.com/payment/return?orderId=${orderId}`,
-        });
-        return response?.data;
-      } catch (error) {
-        throw error;
-      }
+      const response = await OrdersServices.initiatePayment(orderId, {
+        paymentMethod: "CARD",
+        successUrl: `https://yourapp.com/payment/success?orderId=${orderId}`,
+        cancelUrl: `https://yourapp.com/payment/cancel?orderId=${orderId}`,
+        returnUrl: `https://yourapp.com/payment/return?orderId=${orderId}`,
+      });
+      return response?.data;
     },
     onSuccess: (data) => {
-      toast.success("Payment session initialized");
       setClientSecret(data?.clientSecret);
-      router.push("/checkout/stripe");
+      queryClient.invalidateQueries({ queryKey: ["getOrder", orderId] });
     },
     onError: (error) => {
       toast.error(
@@ -69,6 +65,13 @@ const PaymentConfirmPage = () => {
       );
     },
   });
+
+  // Auto-initiate payment on page load to calculate tax
+  useEffect(() => {
+    if (orderId && !clientSecret) {
+      initiatePayment.mutate();
+    }
+  }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Format date
   const formatDate = (dateString) => {
@@ -90,6 +93,7 @@ const PaymentConfirmPage = () => {
   const orderData = getOrder?.data;
 
   const grandTotal = orderData?.grandTotal ?? orderData?.finalizedTotal ?? null;
+  const isCalculating = initiatePayment.isPending || (initiatePayment.isSuccess && getOrder.isFetching);
 
   return (
     <div className="">
@@ -160,9 +164,37 @@ const PaymentConfirmPage = () => {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-[#3A2D28]">TOTAL:</span>
+                  <span className="font-medium text-[#3A2D28]">SUBTOTAL:</span>
                   <span className="font-semibold text-[#3A2D28]">
-                    ${grandTotal?.toFixed(2) || "0.00"}
+                    ${(orderData?.totalPrice ?? 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-[#3A2D28]">TAX:</span>
+                  <span className="font-semibold text-[#3A2D28]">
+                    {isCalculating ? (
+                      <div className="h-4 w-12 bg-gray-300 rounded animate-pulse inline-block" />
+                    ) : (
+                      `$${(taxAmount ?? 0).toFixed(2)}`
+                    )}
+                  </span>
+                </div>
+                {(totalDiscount ?? 0) > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-[#3A2D28]">DISCOUNT:</span>
+                    <span className="font-semibold text-green-600">
+                      -${totalDiscount.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center border-t border-[#F9E6D0] pt-4">
+                  <span className="font-semibold text-[#3A2D28]">TOTAL:</span>
+                  <span className="font-bold text-[#3A2D28] text-lg">
+                    {isCalculating ? (
+                      <div className="h-5 w-20 bg-gray-300 rounded animate-pulse inline-block" />
+                    ) : (
+                      `$${grandTotal?.toFixed(2) || "0.00"}`
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -176,45 +208,7 @@ const PaymentConfirmPage = () => {
               </div>
             </div>
 
-            {/* Order Details Summary */}
-            {/* <div className="bg-white shadow-sm p-1 bg-[#F8F8F8] !rounded-[10px] mb-8">
-              <div className="md:flex md:justify-between md:items-center py-4 px-6 bg-[#F8F8F8] border-b border-[#F9E6D0]">
-                <span className="text-lg font-semibold text-primary">
-                  Taxes:{" "}
-                </span>
-                <span className="text-base md:text-sm text-primary">
-                  {taxAmount === null ? (
-                    <div className="h-4 w-12 bg-gray-300 rounded animate-pulse"></div>
-                  ) : (
-                    `$${taxAmount.toFixed(2)}`
-                  )}
-                </span>
-              </div>
-              <div className="md:flex md:justify-between md:items-center py-4 px-6 bg-[#F8F8F8] border-b border-[#F9E6D0]">
-                <span className="text-lg font-semibold text-primary">
-                  Total Discount:{" "}
-                </span>
-                <span className="text-base md:text-sm text-primary">
-                  {totalDiscount === null ? (
-                    <div className="h-4 w-12 bg-gray-300 rounded animate-pulse"></div>
-                  ) : (
-                    `$${totalDiscount.toFixed(2)}`
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-4 px-6 bg-[#F8F8F8]">
-                <span className="text-lg font-semibold text-primary">
-                  Grand Total:
-                </span>
-                <span className="text-base md:text-sm text-primary">
-                  {!totalAmount ? (
-                    <div className="h-4 w-12 bg-gray-300 rounded animate-pulse"></div>
-                  ) : (
-                    `$${totalAmount}`
-                  )}
-                </span>
-              </div>
-            </div> */}
+
 
             {/* Instructional Text */}
             <p className="text-center text-[#3A2D28] mb-8">
@@ -226,15 +220,15 @@ const PaymentConfirmPage = () => {
             <div className="flex justify-center mb-8">
               <Button
                 type="button"
-                onClick={() => initiatePayment.mutate()}
-                disable={!orderId || initiatePayment?.isPending}
+                onClick={() => router.push("/checkout/stripe")}
+                disable={!clientSecret || isCalculating}
                 className={`px-12 !py-5 rounded-md font-semibold text-lg transition-colors ${
-                  initiatePayment?.isPending
+                  !clientSecret || isCalculating
                     ? "bg-gray-400 text-gray-200 cursor-not-allowed"
                     : "bg-primary text-white hover:bg-opacity-90"
                 }`}
               >
-                {initiatePayment?.isPending ? "Processing..." : "Pay Now"}
+                {isCalculating ? "Calculating total..." : "Pay Now"}
               </Button>
             </div>
 
