@@ -89,6 +89,21 @@ const PaymentConfirmPage = () => {
 
   const orderData = getOrder?.data;
 
+  const computeGrandTotal = (order) => {
+    if (!order) return null;
+    if (order.finalizedTotal !== null && order.finalizedTotal !== undefined) {
+      return Number(order.finalizedTotal);
+    }
+    return (
+      Number(order.totalPrice || 0) +
+      Number(order.tax || 0) +
+      Number(order.shippingFee || 0) -
+      Number(order.discountTotal || 0)
+    );
+  };
+
+  const grandTotal = computeGrandTotal(orderData);
+
   return (
     <div className="">
       {/* Header with Navbar */}
@@ -160,7 +175,7 @@ const PaymentConfirmPage = () => {
                 <div className="flex justify-between items-center">
                   <span className="font-medium text-[#3A2D28]">TOTAL:</span>
                   <span className="font-semibold text-[#3A2D28]">
-                    ${totalAmount?.toFixed(2) || orderData?.totalPrice.toFixed(2) || "0.00"}
+                    ${grandTotal?.toFixed(2) || "0.00"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

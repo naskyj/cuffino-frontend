@@ -140,6 +140,21 @@ const OrderCheckoutPage = () => {
 
   const orderItems = getOrder?.data?.items || [];
 
+  const computeGrandTotal = (order) => {
+    if (!order) return null;
+    if (order.finalizedTotal !== null && order.finalizedTotal !== undefined) {
+      return Number(order.finalizedTotal);
+    }
+    return (
+      Number(order.totalPrice || 0) +
+      Number(order.tax || 0) +
+      Number(order.shippingFee || 0) -
+      Number(order.discountTotal || 0)
+    );
+  };
+
+  const grandTotal = computeGrandTotal(getOrder?.data);
+
   return (
     <div className="">
       {/* Header with Navbar */}
@@ -309,10 +324,10 @@ const OrderCheckoutPage = () => {
                   Grand Total:
                 </span>
                 <span className="text-sm sm:text-base text-primary">
-                  {!totalAmount ? (
+                  {grandTotal === null || grandTotal === undefined ? (
                     <div className="h-4 w-12 bg-gray-300 rounded animate-pulse"></div>
                   ) : (
-                    `$${totalAmount.toFixed(2)}`
+                    `$${grandTotal.toFixed(2)}`
                   )}
                 </span>
               </div>

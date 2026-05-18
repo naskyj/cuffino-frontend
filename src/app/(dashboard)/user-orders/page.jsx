@@ -161,7 +161,14 @@ export default function UserOrders() {
                 <div className="flex items-center gap-4 pl-16 sm:pl-0">
                   <div className="text-right">
                     <p className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(order.totalPrice, order.currency)}
+                      {formatCurrency(
+                        order.finalizedTotal ??
+                          (Number(order.totalPrice || 0) +
+                            Number(order.tax || 0) +
+                            Number(order.shippingFee || 0) -
+                            Number(order.discountTotal || 0)),
+                        order.currency
+                      )}
                     </p>
                     <p className="text-xs text-gray-500">{order.itemCount || ''} items</p>
                   </div>
@@ -279,11 +286,16 @@ export default function UserOrders() {
                         Grand Total:
                       </span>
                       <span className="text-base md:text-sm text-primary">
-                        {!orderDetails.totalPrice ? (
+                        {orderDetails.totalPrice === null ||
+                        orderDetails.totalPrice === undefined ? (
                           <div className="h-4 w-12 bg-gray-300 rounded animate-pulse"></div>
                         ) : (
                           formatCurrency(
-                            orderDetails.totalPrice,
+                            orderDetails.finalizedTotal ??
+                              (Number(orderDetails.totalPrice || 0) +
+                                Number(orderDetails.tax || 0) +
+                                Number(orderDetails.shippingFee || 0) -
+                                Number(orderDetails.discountTotal || 0)),
                             orderDetails.currency
                           )
                         )}
