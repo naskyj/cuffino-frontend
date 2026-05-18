@@ -117,7 +117,7 @@ const OrderCheckoutPage = () => {
 
     try {
       await updateOrderShipmentMutation.mutateAsync(selectedAddressId);
-      // Navigate to payment confirmation page
+      setClientSecret(""); // clear stale session so payment-confirm always initiates fresh
       router.push("/checkout/payment-confirm");
     } catch (error) {
       console.error("Error updating order shipment address:", error);
@@ -289,8 +289,10 @@ const OrderCheckoutPage = () => {
                 <span className="text-sm sm:text-base text-primary">
                   {taxAmount === null ? (
                     <div className="h-4 w-12 bg-gray-300 rounded animate-pulse"></div>
-                  ) : (
+                  ) : taxAmount > 0 ? (
                     `$${taxAmount.toFixed(2)}`
+                  ) : (
+                    <span className="text-sm text-gray-400 italic">Calculated at checkout</span>
                   )}
                 </span>
               </div>
