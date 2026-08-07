@@ -112,6 +112,12 @@ const MeasurementFormModal = ({
     inseam: "",
     thigh: "",
     calf: "",
+    backLength: "",
+    bicep: "",
+    wrist: "",
+    rise: "",
+    ankleCircumference: "",
+    garmentLength: "",
     additionalNotes: "",
     // additionalProp1: "",
     // additionalProp2: "",
@@ -170,6 +176,44 @@ const MeasurementFormModal = ({
     calf: Yup.number()
       .min(0, "Calf measurement must be positive")
       .required("Calf measurement is required"),
+    // Extended, ISO 8559-1 grounded fields (see backend V8 migration) - optional since AI
+    // estimation doesn't reach all of them (rise, garmentLength are manual-only by design).
+    backLength: Yup.number()
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue === null ? null : value
+      )
+      .nullable()
+      .min(0, "Back length must be positive"),
+    bicep: Yup.number()
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue === null ? null : value
+      )
+      .nullable()
+      .min(0, "Bicep measurement must be positive"),
+    wrist: Yup.number()
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue === null ? null : value
+      )
+      .nullable()
+      .min(0, "Wrist measurement must be positive"),
+    rise: Yup.number()
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue === null ? null : value
+      )
+      .nullable()
+      .min(0, "Rise measurement must be positive"),
+    ankleCircumference: Yup.number()
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue === null ? null : value
+      )
+      .nullable()
+      .min(0, "Ankle circumference must be positive"),
+    garmentLength: Yup.number()
+      .transform((value, originalValue) =>
+        originalValue === "" || originalValue === null ? null : value
+      )
+      .nullable()
+      .min(0, "Garment length must be positive"),
     additionalNotes: Yup.string(),
     additionalProp1: Yup.string(),
     additionalProp2: Yup.string(),
@@ -215,6 +259,12 @@ const MeasurementFormModal = ({
         inseam: parseFloat(selectedMeasurement.inseam) || 0,
         thigh: parseFloat(selectedMeasurement.thigh) || 0,
         calf: parseFloat(selectedMeasurement.calf) || 0,
+        backLength: parseFloat(selectedMeasurement.backLength) || 0,
+        bicep: parseFloat(selectedMeasurement.bicep) || 0,
+        wrist: parseFloat(selectedMeasurement.wrist) || 0,
+        rise: parseFloat(selectedMeasurement.rise) || 0,
+        ankleCircumference: parseFloat(selectedMeasurement.ankleCircumference) || 0,
+        garmentLength: parseFloat(selectedMeasurement.garmentLength) || 0,
         additionalNotes: selectedMeasurement.additionalNotes || "",
         customFields: selectedMeasurement.customFields || {},
         customizations: [],
@@ -259,6 +309,12 @@ const MeasurementFormModal = ({
           inseam: parseFloat(values.inseam) || 0,
           thigh: parseFloat(values.thigh) || 0,
           calf: parseFloat(values.calf) || 0,
+          backLength: parseFloat(values.backLength) || 0,
+          bicep: parseFloat(values.bicep) || 0,
+          wrist: parseFloat(values.wrist) || 0,
+          rise: parseFloat(values.rise) || 0,
+          ankleCircumference: parseFloat(values.ankleCircumference) || 0,
+          garmentLength: parseFloat(values.garmentLength) || 0,
           additionalNotes: values.additionalNotes || "",
           // customFields: {
           //   additionalProp1: values.additionalProp1 || "",
@@ -689,6 +745,99 @@ const MeasurementFormModal = ({
                           label=""
                           name="calf"
                           placeholder="Enter calf measurement"
+                          className="w-full"
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Extended measurements - optional, ISO 8559-1 grounded */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-8">
+                      <div className="">
+                        <p className="text-sm md:text-sm pb-1 font-semibold">
+                          Back Length (inches)
+                        </p>
+                        <FormikControl
+                          control="input"
+                          type="number"
+                          label=""
+                          name="backLength"
+                          placeholder="Nape to waist, along the back"
+                          className="w-full"
+                          step="0.1"
+                        />
+                      </div>
+
+                      <div className="">
+                        <p className="text-sm md:text-sm pb-1 font-semibold">
+                          Bicep (inches)
+                        </p>
+                        <FormikControl
+                          control="input"
+                          type="number"
+                          label=""
+                          name="bicep"
+                          placeholder="Upper-arm circumference"
+                          className="w-full"
+                          step="0.1"
+                        />
+                      </div>
+
+                      <div className="">
+                        <p className="text-sm md:text-sm pb-1 font-semibold">
+                          Wrist (inches)
+                        </p>
+                        <FormikControl
+                          control="input"
+                          type="number"
+                          label=""
+                          name="wrist"
+                          placeholder="Wrist circumference"
+                          className="w-full"
+                          step="0.1"
+                        />
+                      </div>
+
+                      <div className="">
+                        <p className="text-sm md:text-sm pb-1 font-semibold">
+                          Rise (inches)
+                        </p>
+                        <FormikControl
+                          control="input"
+                          type="number"
+                          label=""
+                          name="rise"
+                          placeholder="Crotch depth, for trousers"
+                          className="w-full"
+                          step="0.1"
+                        />
+                      </div>
+
+                      <div className="">
+                        <p className="text-sm md:text-sm pb-1 font-semibold">
+                          Ankle Circumference (inches)
+                        </p>
+                        <FormikControl
+                          control="input"
+                          type="number"
+                          label=""
+                          name="ankleCircumference"
+                          placeholder="For trouser hem/cuff fit"
+                          className="w-full"
+                          step="0.1"
+                        />
+                      </div>
+
+                      <div className="">
+                        <p className="text-sm md:text-sm pb-1 font-semibold">
+                          Garment Length (inches)
+                        </p>
+                        <FormikControl
+                          control="input"
+                          type="number"
+                          label=""
+                          name="garmentLength"
+                          placeholder="Desired finished length, e.g. agbada/kaftan"
                           className="w-full"
                           step="0.1"
                         />

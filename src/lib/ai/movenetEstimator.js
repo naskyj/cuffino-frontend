@@ -185,6 +185,23 @@ export const estimateMeasurementsWithMoveNet = async ({
   const thigh = Number.isFinite(hipWidth) ? hipWidth * 0.72 : null;
   const calf = Number.isFinite(thigh) ? thigh * 0.68 : null;
 
+  // Same field set as manual entry (ISO 8559-1 grounded - see backend V8 migration).
+  // MoveNet only gives joint positions, never girth, so bicep/wrist/ankleCircumference
+  // are ratio estimates off shoulderWidth/calf, the same approach already used above for
+  // bust/waist/hips/neck/thigh/calf - not a weaker method than the rest of this function.
+  const midShoulder = midpoint(leftShoulder, rightShoulder);
+  const backLengthRaw = toInches(distance(midShoulder, midHip), pixelsPerInch);
+  // midShoulder sits slightly below the true nape (cervicale/C7) point, so the straight-line
+  // shoulder-to-hip distance is nudged up to approximate the ISO back-length path.
+  const backLength = Number.isFinite(backLengthRaw) ? backLengthRaw * 1.05 : null;
+  const bicep = Number.isFinite(shoulderWidth) ? shoulderWidth * 0.68 : null;
+  const wrist = Number.isFinite(shoulderWidth) ? shoulderWidth * 0.36 : null;
+  const ankleCircumference = Number.isFinite(calf) ? calf * 0.72 : null;
+  // rise (crotch depth) and garmentLength (customer's chosen finished hem) cannot be inferred
+  // from a single front-facing standing photo - left for manual entry rather than guessed.
+  const rise = null;
+  const garmentLength = null;
+
   const confidencePoints = [
     leftShoulder,
     rightShoulder,
@@ -217,6 +234,12 @@ export const estimateMeasurementsWithMoveNet = async ({
       inseam: round1(inseam),
       thigh: round1(thigh),
       calf: round1(calf),
+      backLength: round1(backLength),
+      bicep: round1(bicep),
+      wrist: round1(wrist),
+      ankleCircumference: round1(ankleCircumference),
+      rise,
+      garmentLength,
     },
     diagnostics: {
       calibrationMode,

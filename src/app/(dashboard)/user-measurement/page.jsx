@@ -58,6 +58,14 @@ const validationSchema = Yup.object({
   inseam: measurementField("inseam", "Inseam"),
   thigh: measurementField("thigh", "Thigh"),
   calf: measurementField("calf", "Calf"),
+  // Extended, ISO 8559-1 grounded fields (see backend V8 migration). Optional for every
+  // body type for now - not yet added to REQUIRED_FIELDS_BY_BODY_TYPE.
+  backLength: measurementField("backLength", "Back length"),
+  bicep: measurementField("bicep", "Bicep"),
+  wrist: measurementField("wrist", "Wrist"),
+  rise: measurementField("rise", "Rise"),
+  ankleCircumference: measurementField("ankleCircumference", "Ankle circumference"),
+  garmentLength: measurementField("garmentLength", "Garment length"),
 });
 
 const MEASUREMENT_HELP = {
@@ -107,6 +115,30 @@ const MEASUREMENT_HELP = {
   },
   calf: {
     text: "Measure around the fullest part of your calf.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  backLength: {
+    text: "Measure from the bony bump at the base of your neck (nape) straight down your back to waist level.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  bicep: {
+    text: "Measure around the fullest part of your upper arm, relaxed.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  wrist: {
+    text: "Measure around your wrist bone, where a cuff would sit.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  rise: {
+    text: "Seated, measure from your waistband, through your legs, to the chair - the trouser rise.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  ankleCircumference: {
+    text: "Measure around your ankle, for trouser hem or cuff fit.",
+    image: "/assets/images/howItworks/measure.svg",
+  },
+  garmentLength: {
+    text: "Measure from the nape of your neck down to where you want the garment to end - useful for agbada, kaftan, boubou, and gowns.",
     image: "/assets/images/howItworks/measure.svg",
   },
 };
@@ -209,6 +241,12 @@ export default function UserMeasurement() {
     inseam: "",
     thigh: "",
     calf: "",
+    backLength: "",
+    bicep: "",
+    wrist: "",
+    rise: "",
+    ankleCircumference: "",
+    garmentLength: "",
     additionalNotes: "",
     preferences: "",
     additionalField: "",
@@ -249,6 +287,12 @@ export default function UserMeasurement() {
         inseam: parseOrNull(values.inseam),
         thigh: parseOrNull(values.thigh),
         calf: parseOrNull(values.calf),
+        backLength: parseOrNull(values.backLength),
+        bicep: parseOrNull(values.bicep),
+        wrist: parseOrNull(values.wrist),
+        rise: parseOrNull(values.rise),
+        ankleCircumference: parseOrNull(values.ankleCircumference),
+        garmentLength: parseOrNull(values.garmentLength),
         additionalNotes: values.additionalNotes || "",
         customFields: Object.keys(customFields).length > 0 ? customFields : {},
       };
@@ -389,6 +433,22 @@ export default function UserMeasurement() {
                   </div>
                 </div>
 
+                {/* Extended Measurements Section - ISO 8559-1 grounded, optional */}
+                <div className="border border-gray-100 rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded bg-primary/10 text-primary text-xs flex items-center justify-center">3</span>
+                    Extended (Optional)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Back Length" helpKey="backLength" />} name="backLength" placeholder="Nape to waist" className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Bicep" helpKey="bicep" />} name="bicep" placeholder="Upper-arm circumference" className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Wrist" helpKey="wrist" />} name="wrist" placeholder="Wrist circumference" className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Rise" helpKey="rise" />} name="rise" placeholder="Trouser rise" className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Ankle Circumference" helpKey="ankleCircumference" />} name="ankleCircumference" placeholder="For trouser hem/cuff fit" className="w-full" />
+                    <FormikControl control="input" type="text" label={<MeasurementLabel label="Garment Length" helpKey="garmentLength" />} name="garmentLength" placeholder="e.g., agbada/kaftan finished length" className="w-full" />
+                  </div>
+                </div>
+
                 {/* Additional Notes Section */}
                 <div className="border border-gray-100 rounded-xl overflow-hidden">
                   <button
@@ -433,8 +493,8 @@ export default function UserMeasurement() {
                       <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg p-3">
                         <strong>Format:</strong> Enter additional measurements as{" "}
                         <code className="bg-blue-100 px-1 rounded font-mono">partName:measurement</code>.{" "}
-                        For example: <code className="bg-blue-100 px-1 rounded font-mono">ankle:9.5</code> or{" "}
-                        <code className="bg-blue-100 px-1 rounded font-mono">wrist:6.5</code>.
+                        For example: <code className="bg-blue-100 px-1 rounded font-mono">collar:15.5</code> or{" "}
+                        <code className="bg-blue-100 px-1 rounded font-mono">crotchWidth:8</code>.
                       </p>
                       <FormikControl control="input" type="text" label="Preferences" name="preferences" placeholder="e.g., loose fit, extra room at shoulders" className="w-full" />
                       <FormikControl control="input" type="text" label="Additional Measurement" name="additionalField" placeholder="e.g., ankle:9.5" className="w-full" />
@@ -538,6 +598,24 @@ export default function UserMeasurement() {
                     <MeasurementStat label="Inseam" value={measurement.inseam} />
                     <MeasurementStat label="Thigh" value={measurement.thigh} />
                     <MeasurementStat label="Calf" value={measurement.calf} />
+                    {measurement.backLength != null && (
+                      <MeasurementStat label="Back Length" value={measurement.backLength} />
+                    )}
+                    {measurement.bicep != null && (
+                      <MeasurementStat label="Bicep" value={measurement.bicep} />
+                    )}
+                    {measurement.wrist != null && (
+                      <MeasurementStat label="Wrist" value={measurement.wrist} />
+                    )}
+                    {measurement.rise != null && (
+                      <MeasurementStat label="Rise" value={measurement.rise} />
+                    )}
+                    {measurement.ankleCircumference != null && (
+                      <MeasurementStat label="Ankle" value={measurement.ankleCircumference} />
+                    )}
+                    {measurement.garmentLength != null && (
+                      <MeasurementStat label="Garment Length" value={measurement.garmentLength} />
+                    )}
                   </div>
 
                   {(measurement.additionalNotes || (measurement.customFields && Object.keys(measurement.customFields).length > 0)) && (
