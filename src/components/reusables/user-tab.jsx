@@ -10,6 +10,7 @@ import {
   FiLogOut,
   FiFileText,
   FiShoppingBag,
+  FiHelpCircle,
 } from "react-icons/fi";
 import { GrMapLocation } from "react-icons/gr";
 
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/user-measurement", label: "Measurements", icon: FiFileText, slug: "user-measurement" },
   { href: "/user-orders", label: "Orders", icon: FiShoppingBag, slug: "user-orders" },
   { href: "/user-delivery-address", label: "Delivery Address", icon: GrMapLocation, slug: "user-delivery-address" },
+  { href: "/user-support", label: "Support", icon: FiHelpCircle, slug: "user-support" },
   { href: "/user-setting", label: "Settings", icon: FiSettings, slug: "user-setting" },
 ];
 

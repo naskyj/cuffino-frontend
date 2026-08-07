@@ -2,10 +2,16 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import useAuth from "@/core/zustand/auth.store";
 import { OrdersServices } from "@/services/orders";
-import { FiX, FiShoppingBag, FiChevronRight, FiPackage, FiCalendar } from "react-icons/fi";
+import { UserServices } from "@/services/user";
+import { FiX, FiShoppingBag, FiChevronRight, FiPackage, FiCalendar, FiMapPin } from "react-icons/fi";
+
+// SOP_CANCELLATIONS.md "Post-payment change requests": a shipping-address correction is
+// accepted any time up until the order enters shipment preparation - matches the backend's
+// updateShippingAddress rule (blocked once READY_FOR_DELIVERY/DELIVERED/CANCELLED).
+const ADDRESS_LOCKED_STATUSES = ["READY_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -30,8 +36,13 @@ const StatusBadge = ({ status }) => {
 
 export default function UserOrders() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [selectedNewAddressId, setSelectedNewAddressId] = useState("");
+  const [addressUpdateError, setAddressUpdateError] = useState("");
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
 
   // Fetch all orders
   const { data: ordersData, isLoading } = useQuery({
@@ -53,7 +64,21 @@ export default function UserOrders() {
     enabled: !!selectedOrderId && isModalOpen,
   });
 
+  // Saved addresses, only fetched once the customer opens the address editor
+  const { data: savedAddressesData } = useQuery({
+    queryKey: ["getUsersAddresses", user?.userId],
+    queryFn: async () => {
+      const response = await UserServices.getUsersAddresses(user?.userId);
+      return Array.isArray(response?.data) ? response.data : response?.data?.data || [];
+    },
+    enabled: !!user?.userId && isEditingAddress,
+  });
+  const savedAddresses = Array.isArray(savedAddressesData) ? savedAddressesData : [];
+
   const orders = Array.isArray(ordersData) ? ordersData : [];
+
+  const canEditShippingAddress = (status) =>
+    !ADDRESS_LOCKED_STATUSES.includes((status || "").toUpperCase());
 
   const handleOrderClick = (orderId) => {
     setSelectedOrderId(orderId);
@@ -63,6 +88,32 @@ export default function UserOrders() {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedOrderId(null);
+    setIsEditingAddress(false);
+    setAddressUpdateError("");
+  };
+
+  const handleSaveAddress = async () => {
+    if (!selectedNewAddressId) {
+      setAddressUpdateError("Please select an address.");
+      return;
+    }
+    setIsSavingAddress(true);
+    setAddressUpdateError("");
+    try {
+      await OrdersServices.updateOrderShipmentAddress(selectedOrderId, {
+        addressId: Number(selectedNewAddressId),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["getOrder", selectedOrderId] });
+      setIsEditingAddress(false);
+      setSelectedNewAddressId("");
+    } catch (err) {
+      setAddressUpdateError(
+        err?.response?.data?.message ||
+          "Could not update the shipping address. It may be too late to change once the order is being prepared for delivery."
+      );
+    } finally {
+      setIsSavingAddress(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -207,6 +258,93 @@ export default function UserOrders() {
                 </div>
               ) : orderDetails ? (
                 <>
+                  {/* Shipping Address - editable until the order enters shipment prep
+                      (SOP_CANCELLATIONS.md "Post-payment change requests") */}
+                  <div className="bg-white rounded-lg shadow-sm border mb-6 p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <FiMapPin className="w-5 h-5 text-primary mt-0.5" />
+                        <div>
+                          <h3 className="font-semibold text-gray-900 text-sm mb-1">
+                            Shipping Address
+                          </h3>
+                          {orderDetails.shippingAddress ? (
+                            <p className="text-sm text-gray-600">
+                              {[
+                                orderDetails.shippingAddress.streetAddress,
+                                orderDetails.shippingAddress.city,
+                                orderDetails.shippingAddress.state,
+                                orderDetails.shippingAddress.postalCode,
+                                orderDetails.shippingAddress.country,
+                              ]
+                                .filter(Boolean)
+                                .join(", ")}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-gray-400">No address on file</p>
+                          )}
+                        </div>
+                      </div>
+                      {canEditShippingAddress(orderDetails.status) && !isEditingAddress && (
+                        <button
+                          onClick={() => setIsEditingAddress(true)}
+                          className="text-primary text-sm font-medium hover:underline whitespace-nowrap"
+                        >
+                          Change
+                        </button>
+                      )}
+                    </div>
+
+                    {!canEditShippingAddress(orderDetails.status) && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        This order is being prepared for delivery, so the shipping address can no
+                        longer be changed here - contact support if you need help.
+                      </p>
+                    )}
+
+                    {isEditingAddress && (
+                      <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                        {addressUpdateError && (
+                          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                            {addressUpdateError}
+                          </div>
+                        )}
+                        <select
+                          value={selectedNewAddressId}
+                          onChange={(e) => setSelectedNewAddressId(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        >
+                          <option value="">Select a saved address</option>
+                          {savedAddresses.map((addr) => (
+                            <option key={addr.addressId} value={addr.addressId}>
+                              {[addr.label, addr.streetAddress, addr.city, addr.state]
+                                .filter(Boolean)
+                                .join(" - ")}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setIsEditingAddress(false);
+                              setAddressUpdateError("");
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveAddress}
+                            disabled={isSavingAddress}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-white hover:opacity-90 disabled:opacity-60"
+                          >
+                            {isSavingAddress ? "Saving..." : "Save Address"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Order Items */}
                   <div className="bg-white rounded-lg shadow-sm border mb-6">
                     {/* Table Header */}
