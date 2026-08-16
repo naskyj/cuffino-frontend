@@ -45,8 +45,39 @@ const buildAiNote = (diagnostics) => {
   return `${base} ${calibrationNote} Please verify manually.`;
 };
 
+const CALIBRATION_HELP = {
+  height: {
+    title: "Use Height",
+    text:
+      "Enter your height, and the AI finds your head and feet in the photo. It compares that " +
+      "pixel distance to the height you entered to work out how many pixels equal one inch, " +
+      "then uses that same ratio for every other measurement. Fastest option - no extra props " +
+      "needed. Accuracy depends on your height being entered correctly and your whole body " +
+      "(head to feet) being clearly visible and reasonably straight in the photo.",
+  },
+  marker: {
+    title: "Use Reference Marker",
+    text:
+      "Instead of relying on your stated height, you place something of a known, fixed size " +
+      "(a credit/ID card by default) in the photo, at roughly the same distance from the " +
+      "camera as your body, then click both ends of it directly on the photo. The app measures " +
+      "that click-to-click distance against the object's real size to work out the same " +
+      "pixels-to-inches ratio. One extra step, but you're confirming the scale yourself instead " +
+      "of relying on an automatic head-to-foot detection - can be more accurate.",
+    steps: [
+      "Select \"Use Reference Marker.\"",
+      "Get a credit/ID card (or enter a custom width if using something else).",
+      "In the photo, hold the card flat against your body, or place it beside your feet - about the same distance from the camera as you are.",
+      "Upload the photo.",
+      "Click both ends of the card directly on the photo that appears.",
+      "Click \"Estimate with AI.\"",
+    ],
+  },
+};
+
 export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [calibrationMode, setCalibrationMode] = useState("height");
+  const [showCalibrationHelp, setShowCalibrationHelp] = useState(false);
   const [heightInches, setHeightInches] = useState("");
   const [markerWidthInches, setMarkerWidthInches] = useState("3.375");
   const [markerPoints, setMarkerPoints] = useState([]); // natural-image-pixel coords, up to 2
@@ -256,7 +287,18 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
         <div>
-          <label className="text-xs font-medium text-gray-700">Calibration Mode</label>
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs font-medium text-gray-700">Calibration Mode</label>
+            <button
+              type="button"
+              onClick={() => setShowCalibrationHelp((current) => !current)}
+              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] text-gray-600 bg-white hover:bg-gray-50"
+              aria-expanded={showCalibrationHelp}
+              aria-label="What's the difference between calibration modes?"
+            >
+              ?
+            </button>
+          </div>
           <select
             value={calibrationMode}
             onChange={(event) => {
@@ -305,6 +347,31 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
           </div>
         )}
       </div>
+
+      {showCalibrationHelp && (
+        <div className="mt-3 space-y-3 rounded-md border border-amber-300 bg-white p-3 text-xs text-gray-700">
+          {Object.entries(CALIBRATION_HELP).map(([key, help]) => (
+            <div key={key} className={calibrationMode === key ? "" : "opacity-70"}>
+              <p className="font-semibold text-gray-900">
+                {help.title}
+                {calibrationMode === key && (
+                  <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    selected
+                  </span>
+                )}
+              </p>
+              <p className="mt-1">{help.text}</p>
+              {help.steps && (
+                <ol className="mt-1.5 list-decimal space-y-0.5 pl-4">
+                  {help.steps.map((step, index) => (
+                    <li key={index}>{step}</li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="pt-3">
         <label className="text-xs font-medium text-gray-700">Front photo</label>
