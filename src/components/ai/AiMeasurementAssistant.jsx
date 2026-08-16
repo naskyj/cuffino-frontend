@@ -89,6 +89,8 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
 
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const libraryInputRef = useRef(null);
 
   const revokeCurrentPreview = () => {
     if (imagePreviewUrl) {
@@ -375,16 +377,46 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
 
       <div className="pt-3">
         <label className="text-xs font-medium text-gray-700">Front photo</label>
+        {/*
+         * Two separate inputs rather than one relying on the OS's default file-picker chooser:
+         * on iOS that default chooser reliably offers Camera + Photos + Files, but on Android
+         * it's inconsistent - some devices/Chrome versions only surface a gallery/album picker
+         * with no camera shortcut at all. `capture` reliably forces the camera on both platforms
+         * (that's what caused the original "always opens camera" bug), so it's used deliberately
+         * here on a dedicated Take Photo button, with a separate capture-less input for Choose
+         * from Library - giving both options explicitly instead of hoping the OS picker does.
+         */}
         <input
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
-          // No `capture` attribute: on many mobile browsers, setting capture forces the file
-          // input straight into the camera app and skips the native chooser entirely, blocking
-          // access to the photo library. Omitting it lets the OS show its normal "camera or
-          // library" picker, which still includes the camera as an option.
-          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+          capture="environment"
+          className="hidden"
           onChange={handleFileChange}
         />
+        <input
+          ref={libraryInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <div className="mt-1 flex gap-2">
+          <Button
+            type="button"
+            className="flex-1 border border-gray-300 bg-white text-gray-700 rounded-md"
+            onClick={() => cameraInputRef.current?.click()}
+          >
+            Take Photo
+          </Button>
+          <Button
+            type="button"
+            className="flex-1 border border-gray-300 bg-white text-gray-700 rounded-md"
+            onClick={() => libraryInputRef.current?.click()}
+          >
+            Choose from Library
+          </Button>
+        </div>
       </div>
 
       {calibrationMode === "marker" && imageInfo && (
