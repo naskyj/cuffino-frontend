@@ -378,7 +378,10 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
         <input
           type="file"
           accept="image/*"
-          capture="environment"
+          // No `capture` attribute: on many mobile browsers, setting capture forces the file
+          // input straight into the camera app and skips the native chooser entirely, blocking
+          // access to the photo library. Omitting it lets the OS show its normal "camera or
+          // library" picker, which still includes the camera as an option.
           className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
           onChange={handleFileChange}
         />
