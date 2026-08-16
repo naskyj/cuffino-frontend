@@ -346,6 +346,7 @@ export default function UserMeasurement() {
             {(formik) => (
               <Form className="space-y-6">
                 <AiMeasurementAssistant
+                  bodyType={formik.values.bodyType}
                   onApply={({ measurements, aiNote }) => {
                     Object.entries(measurements).forEach(([field, value]) => {
                       if (value !== null && value !== undefined) {

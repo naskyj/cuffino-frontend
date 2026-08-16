@@ -1,6 +1,21 @@
 let detectorPromise = null;
 
-const MIN_KEYPOINT_SCORE = 0.2;
+// Core skeletal points measurements actually depend on - if these are missing or too noisy,
+// the resulting numbers aren't trustworthy enough to hand to a tailor, so estimation is
+// refused outright rather than silently returning a bad guess (see CORE_KEYPOINTS below).
+const CORE_MIN_SCORE = 0.3;
+// Face points are only used to find the top of the head for calibration, not for precise
+// distance math, so a lower bar is acceptable here.
+const FACE_MIN_SCORE = 0.15;
+
+const CORE_KEYPOINTS = [
+  "left_shoulder",
+  "right_shoulder",
+  "left_hip",
+  "right_hip",
+  "left_ankle",
+  "right_ankle",
+];
 
 const distance = (a, b) => {
   if (!a || !b) return null;
@@ -36,7 +51,7 @@ const round1 = (value) => {
   return Math.round(value * 10) / 10;
 };
 
-const getKeypoint = (pose, name, minScore = MIN_KEYPOINT_SCORE) => {
+const getKeypoint = (pose, name, minScore) => {
   const keypoint = pose?.keypoints?.find((item) => item.name === name || item.part === name);
   if (!keypoint) return null;
   if ((keypoint.score ?? 0) < minScore) return null;
@@ -55,8 +70,10 @@ const ensureDetector = async () => {
         await tf.setBackend("webgl");
       }
 
+      // THUNDER over LIGHTNING: this is a one-shot photo analysis, not live video, so there's
+      // no reason to trade accuracy for the speed LIGHTNING is optimized for.
       return poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
-        modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+        modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER,
       });
     })();
   }
@@ -64,14 +81,33 @@ const ensureDetector = async () => {
   return detectorPromise;
 };
 
+/*
+ * Body-type ratio adjustments (bust/waist/hip/etc. from a single 2D photo can only ever be a
+ * ratio-based guess - MoveNet gives joint positions, never girth - see AiMeasurementAssistant's
+ * help text). These per-bodyType multipliers are a modest adjustment for well-known general
+ * population differences (e.g. women average a narrower waist relative to hip than men), not a
+ * precise correction - still population averages applied to one photo, not a measurement of the
+ * actual person. MEN/WOMEN get adjusted multipliers; CHILDREN keeps the neutral set since child
+ * body proportions vary enough by age that a single adjustment would likely do more harm than
+ * good - flagged as lower-confidence for children in the returned diagnostics instead.
+ */
+const RATIO_SETS = {
+  DEFAULT: { bust: 1.95, waist: 1.05, hips: 1.4, neck: 0.37, thigh: 0.72, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
+  MEN: { bust: 2.0, waist: 1.1, hips: 1.32, neck: 0.4, thigh: 0.72, calf: 0.68, bicep: 0.72, wrist: 0.37, ankle: 0.72 },
+  WOMEN: { bust: 1.92, waist: 0.95, hips: 1.45, neck: 0.35, thigh: 0.74, calf: 0.68, bicep: 0.65, wrist: 0.35, ankle: 0.72 },
+  CHILDREN: { bust: 1.95, waist: 1.05, hips: 1.4, neck: 0.37, thigh: 0.72, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
+};
+
+const getRatios = (bodyType) => RATIO_SETS[bodyType] || RATIO_SETS.DEFAULT;
+
 export const estimateMeasurementsWithMoveNet = async ({
   imageElement,
   heightInches,
   calibrationMode = "height",
   markerWidthInches,
   markerPixelWidth,
+  bodyType,
 }) => {
-
   const height = Number(heightInches);
   const markerWidth = Number(markerWidthInches);
   const markerPixels = Number(markerPixelWidth);
@@ -87,7 +123,7 @@ export const estimateMeasurementsWithMoveNet = async ({
       throw new Error("Please provide a valid marker width in inches.");
     }
     if (!Number.isFinite(markerPixels) || markerPixels <= 1) {
-      throw new Error("Please provide a valid marker width in pixels.");
+      throw new Error("Please mark both ends of your reference object on the photo.");
     }
   }
 
@@ -103,40 +139,66 @@ export const estimateMeasurementsWithMoveNet = async ({
 
   const pose = poses[0];
 
-  const leftShoulder = getKeypoint(pose, "left_shoulder");
-  const rightShoulder = getKeypoint(pose, "right_shoulder");
-  const leftElbow = getKeypoint(pose, "left_elbow");
-  const rightElbow = getKeypoint(pose, "right_elbow");
-  const leftWrist = getKeypoint(pose, "left_wrist");
-  const rightWrist = getKeypoint(pose, "right_wrist");
-  const leftHip = getKeypoint(pose, "left_hip");
-  const rightHip = getKeypoint(pose, "right_hip");
-  const leftKnee = getKeypoint(pose, "left_knee");
-  const rightKnee = getKeypoint(pose, "right_knee");
-  const leftAnkle = getKeypoint(pose, "left_ankle");
-  const rightAnkle = getKeypoint(pose, "right_ankle");
-  const nose = getKeypoint(pose, "nose", 0.1);
-  const leftEye = getKeypoint(pose, "left_eye", 0.1);
-  const rightEye = getKeypoint(pose, "right_eye", 0.1);
-  const leftEar = getKeypoint(pose, "left_ear", 0.1);
-  const rightEar = getKeypoint(pose, "right_ear", 0.1);
+  const leftShoulder = getKeypoint(pose, "left_shoulder", CORE_MIN_SCORE);
+  const rightShoulder = getKeypoint(pose, "right_shoulder", CORE_MIN_SCORE);
+  const leftElbow = getKeypoint(pose, "left_elbow", CORE_MIN_SCORE);
+  const rightElbow = getKeypoint(pose, "right_elbow", CORE_MIN_SCORE);
+  const leftWrist = getKeypoint(pose, "left_wrist", CORE_MIN_SCORE);
+  const rightWrist = getKeypoint(pose, "right_wrist", CORE_MIN_SCORE);
+  const leftHip = getKeypoint(pose, "left_hip", CORE_MIN_SCORE);
+  const rightHip = getKeypoint(pose, "right_hip", CORE_MIN_SCORE);
+  const leftKnee = getKeypoint(pose, "left_knee", CORE_MIN_SCORE);
+  const rightKnee = getKeypoint(pose, "right_knee", CORE_MIN_SCORE);
+  const leftAnkle = getKeypoint(pose, "left_ankle", CORE_MIN_SCORE);
+  const rightAnkle = getKeypoint(pose, "right_ankle", CORE_MIN_SCORE);
+  const nose = getKeypoint(pose, "nose", FACE_MIN_SCORE);
+  const leftEye = getKeypoint(pose, "left_eye", FACE_MIN_SCORE);
+  const rightEye = getKeypoint(pose, "right_eye", FACE_MIN_SCORE);
+  const leftEar = getKeypoint(pose, "left_ear", FACE_MIN_SCORE);
+  const rightEar = getKeypoint(pose, "right_ear", FACE_MIN_SCORE);
 
-  const topCandidates = [nose, leftEye, rightEye, leftEar, rightEar, leftShoulder, rightShoulder]
-    .filter(Boolean)
-    .map((point) => point.y);
-
-  const bottomCandidates = [leftAnkle, rightAnkle, leftKnee, rightKnee]
-    .filter(Boolean)
-    .map((point) => point.y);
-
-  if (!topCandidates.length || !bottomCandidates.length) {
-    throw new Error("Unable to detect enough body keypoints. Ensure full body is visible.");
+  const missingCore = CORE_KEYPOINTS.filter((name) => {
+    const point = getKeypoint(pose, name, CORE_MIN_SCORE);
+    return !point;
+  });
+  if (missingCore.length) {
+    throw new Error(
+      `Couldn't clearly see: ${missingCore.map((n) => n.replace("_", " ")).join(", ")}. ` +
+        "Retake the photo with your full body visible, good lighting, and arms slightly away from your sides."
+    );
   }
 
-  const pixelBodyHeight = Math.max(...bottomCandidates) - Math.min(...topCandidates);
-  if (!Number.isFinite(pixelBodyHeight) || pixelBodyHeight <= 1) {
+  // Calibration: MoveNet has no "top of head" keypoint, so the true crown position has to be
+  // inferred. Using the raw topmost detected keypoint (previously any of nose/eye/ear/shoulder,
+  // whichever scored highest) systematically undercounts pixel height, since even the eyes sit
+  // noticeably below the crown - which then throws off every measurement derived from
+  // pixelsPerInch, not just height. Correct for it using standard figure-proportion fractions:
+  // the eye-line sits ~6.7% of total height below the crown (roughly half a head-height, with
+  // adult head height averaging ~1/7.5 of total height); the shoulder line sits ~16.7% below
+  // the crown (~1.25 head-heights). These are population averages, not this specific person's
+  // proportions, but they're a large improvement over assuming zero offset.
+  const faceTop = [nose, leftEye, rightEye, leftEar, rightEar].filter(Boolean);
+  const bottomCandidates = [leftAnkle, rightAnkle, leftKnee, rightKnee].filter(Boolean).map((p) => p.y);
+  const bottomY = Math.max(...bottomCandidates);
+
+  let topY;
+  let topFraction; // fraction of total height the raw span (topY to bottomY) represents
+  let calibrationQuality;
+  if (faceTop.length) {
+    topY = Math.min(...faceTop.map((p) => p.y));
+    topFraction = 0.933;
+    calibrationQuality = "good";
+  } else {
+    topY = Math.min(leftShoulder.y, rightShoulder.y);
+    topFraction = 0.833;
+    calibrationQuality = "reduced";
+  }
+
+  const pixelBodyHeightRaw = bottomY - topY;
+  if (!Number.isFinite(pixelBodyHeightRaw) || pixelBodyHeightRaw <= 1) {
     throw new Error("Could not infer body scale from image.");
   }
+  const pixelBodyHeight = pixelBodyHeightRaw / topFraction;
 
   let pixelsPerInch;
   if (calibrationMode === "marker") {
@@ -144,6 +206,8 @@ export const estimateMeasurementsWithMoveNet = async ({
   } else {
     pixelsPerInch = pixelBodyHeight / height;
   }
+
+  const ratios = getRatios(bodyType);
 
   const shoulderWidth = toInches(distance(leftShoulder, rightShoulder), pixelsPerInch);
   const hipWidth = toInches(distance(leftHip, rightHip), pixelsPerInch);
@@ -177,46 +241,45 @@ export const estimateMeasurementsWithMoveNet = async ({
   const inseamRaw = toInches(distance(midHip, midAnkle), pixelsPerInch);
   const inseam = Number.isFinite(inseamRaw) ? inseamRaw * 0.92 : null;
 
-  const bust = Number.isFinite(shoulderWidth) ? shoulderWidth * 1.95 : null;
-  const waist = Number.isFinite(hipWidth) ? hipWidth * 1.05 : null;
-  const hips = Number.isFinite(hipWidth) ? hipWidth * 1.4 : null;
-  const neck = Number.isFinite(shoulderWidth) ? shoulderWidth * 0.37 : null;
+  const bust = Number.isFinite(shoulderWidth) ? shoulderWidth * ratios.bust : null;
+  const waist = Number.isFinite(hipWidth) ? hipWidth * ratios.waist : null;
+  const hips = Number.isFinite(hipWidth) ? hipWidth * ratios.hips : null;
+  const neck = Number.isFinite(shoulderWidth) ? shoulderWidth * ratios.neck : null;
   const sleeveLength = Number.isFinite(armLength) ? armLength * 0.95 : null;
-  const thigh = Number.isFinite(hipWidth) ? hipWidth * 0.72 : null;
-  const calf = Number.isFinite(thigh) ? thigh * 0.68 : null;
+  const thigh = Number.isFinite(hipWidth) ? hipWidth * ratios.thigh : null;
+  const calf = Number.isFinite(thigh) ? thigh * ratios.calf : null;
 
-  // Same field set as manual entry (ISO 8559-1 grounded - see backend V8 migration).
-  // MoveNet only gives joint positions, never girth, so bicep/wrist/ankleCircumference
-  // are ratio estimates off shoulderWidth/calf, the same approach already used above for
-  // bust/waist/hips/neck/thigh/calf - not a weaker method than the rest of this function.
   const midShoulder = midpoint(leftShoulder, rightShoulder);
   const backLengthRaw = toInches(distance(midShoulder, midHip), pixelsPerInch);
-  // midShoulder sits slightly below the true nape (cervicale/C7) point, so the straight-line
-  // shoulder-to-hip distance is nudged up to approximate the ISO back-length path.
   const backLength = Number.isFinite(backLengthRaw) ? backLengthRaw * 1.05 : null;
-  const bicep = Number.isFinite(shoulderWidth) ? shoulderWidth * 0.68 : null;
-  const wrist = Number.isFinite(shoulderWidth) ? shoulderWidth * 0.36 : null;
-  const ankleCircumference = Number.isFinite(calf) ? calf * 0.72 : null;
+  const bicep = Number.isFinite(shoulderWidth) ? shoulderWidth * ratios.bicep : null;
+  const wrist = Number.isFinite(shoulderWidth) ? shoulderWidth * ratios.wrist : null;
+  const ankleCircumference = Number.isFinite(calf) ? calf * ratios.ankle : null;
   // rise (crotch depth) and garmentLength (customer's chosen finished hem) cannot be inferred
   // from a single front-facing standing photo - left for manual entry rather than guessed.
   const rise = null;
   const garmentLength = null;
 
-  const confidencePoints = [
-    leftShoulder,
-    rightShoulder,
-    leftElbow,
-    rightElbow,
-    leftWrist,
-    rightWrist,
-    leftHip,
-    rightHip,
-    leftKnee,
-    rightKnee,
-    leftAnkle,
-    rightAnkle,
-  ].filter(Boolean);
-  const confidence = average(confidencePoints.map((point) => point.score ?? 0)) ?? 0;
+  const keypointList = [
+    ["left_shoulder", leftShoulder],
+    ["right_shoulder", rightShoulder],
+    ["left_elbow", leftElbow],
+    ["right_elbow", rightElbow],
+    ["left_wrist", leftWrist],
+    ["right_wrist", rightWrist],
+    ["left_hip", leftHip],
+    ["right_hip", rightHip],
+    ["left_knee", leftKnee],
+    ["right_knee", rightKnee],
+    ["left_ankle", leftAnkle],
+    ["right_ankle", rightAnkle],
+    ["nose", nose],
+  ].filter(([, point]) => Boolean(point));
+
+  const confidence = average(keypointList.map(([, point]) => point.score ?? 0)) ?? 0;
+  const perKeypointConfidence = Object.fromEntries(
+    keypointList.map(([name, point]) => [name, round1(point.score ?? 0)])
+  );
 
   const estimatedHeight = toInches(pixelBodyHeight, pixelsPerInch);
 
@@ -241,13 +304,19 @@ export const estimateMeasurementsWithMoveNet = async ({
       rise,
       garmentLength,
     },
+    // Natural-image-pixel keypoints so the UI can draw a skeleton overlay for visual
+    // confirmation of what was actually detected, before the user trusts the numbers.
+    keypoints: keypointList.map(([name, point]) => ({ name, x: point.x, y: point.y, score: point.score ?? 0 })),
     diagnostics: {
       calibrationMode,
+      calibrationQuality,
+      bodyType: bodyType || "DEFAULT",
       pixelBodyHeight: round1(pixelBodyHeight),
       pixelsPerInch: round1(pixelsPerInch),
       markerWidthInches: calibrationMode === "marker" ? round1(markerWidth) : null,
       markerPixelWidth: calibrationMode === "marker" ? round1(markerPixels) : null,
       keypointConfidence: round1(confidence),
+      perKeypointConfidence,
     },
   };
 };

@@ -532,6 +532,7 @@ const MeasurementFormModal = ({
                 return (
                   <Form className="space-y-[20px]">
                     <AiMeasurementAssistant
+                      bodyType={formik.values.bodyType}
                       onApply={({ measurements, aiNote }) => {
                         Object.entries(measurements).forEach(([field, value]) => {
                           if (value !== null && value !== undefined) {
