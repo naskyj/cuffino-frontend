@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import useAuth from "@/core/zustand/auth.store";
 import { SupportServices } from "@/services/support";
@@ -159,13 +160,17 @@ export default function UserSupport() {
       ) : (
         <div className="space-y-3">
           {tickets.map((ticket) => (
-            <div
+            <Link
               key={ticket.ticketId}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5"
+              href={`/user-support/${ticket.ticketId}`}
+              className="block bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:border-primary/30 hover:shadow-md transition-all"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium text-gray-400">
+                      #{ticket.ticketId}
+                    </span>
                     <h3 className="font-semibold text-gray-900">{ticket.subject}</h3>
                     <StatusBadge status={ticket.status} />
                   </div>
@@ -177,7 +182,7 @@ export default function UserSupport() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

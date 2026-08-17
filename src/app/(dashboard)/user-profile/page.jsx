@@ -18,7 +18,8 @@ const validationSchema = Yup.object({
 });
 
 export default function UserProfile() {
-  const [profileImage, setProfileImage] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const { user, setUser } = useAuth();
 
   // Fetch delivery addresses to show in profile
@@ -44,16 +45,35 @@ export default function UserProfile() {
     phoneNumber: user?.userDetail?.phoneNumber || "",
   };
 
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImage(reader.result);
-      };
-      reader.readAsDataURL(file);
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // allow re-selecting the same file later
+    if (!file || !user?.userId) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => setProfileImagePreview(reader.result);
+    reader.readAsDataURL(file);
+
+    try {
+      setIsUploadingPicture(true);
+      const response = await UserServices.uploadProfilePicture(user.userId, file);
+      if (response?.data) {
+        setUser(response.data);
+      }
+      toast.success("Profile picture updated!");
+    } catch (error) {
+      setProfileImagePreview(null);
+      toast.error(
+        error?.response?.data?.message || "Failed to upload profile picture"
+      );
+    } finally {
+      setIsUploadingPicture(false);
     }
   };
+
+  // The server-saved picture is the source of truth; the local preview only covers the gap
+  // between picking a file and the upload finishing (and is cleared on failure).
+  const profileImage = profileImagePreview || user?.userDetail?.profilePictureUrl || null;
 
   const updateMutation = useMutation({
     mutationFn: async (payload) => {
@@ -115,7 +135,7 @@ export default function UserProfile() {
                   <img
                     src={profileImage}
                     alt="Profile"
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full object-cover ${isUploadingPicture ? "opacity-50" : ""}`}
                   />
                 ) : (
                   <span className="text-2xl font-bold text-primary">
@@ -125,7 +145,11 @@ export default function UserProfile() {
               </div>
               <label
                 htmlFor="profileImageUpload"
-                className="absolute bottom-1 right-1 w-8 h-8 bg-primary text-white rounded-full cursor-pointer hover:bg-primary/90 transition-all flex items-center justify-center shadow-md"
+                className={`absolute bottom-1 right-1 w-8 h-8 bg-primary text-white rounded-full transition-all flex items-center justify-center shadow-md ${
+                  isUploadingPicture
+                    ? "opacity-60 cursor-not-allowed"
+                    : "cursor-pointer hover:bg-primary/90"
+                }`}
               >
                 <FiCamera size={14} />
               </label>
@@ -134,6 +158,7 @@ export default function UserProfile() {
                 type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
+                disabled={isUploadingPicture}
                 className="hidden"
               />
             </div>

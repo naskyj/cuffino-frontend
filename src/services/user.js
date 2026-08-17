@@ -2,6 +2,13 @@ import axiosInstance from "@/core/api/api";
 
 export const UserServices = {
     updateUser: (payload, userId) => axiosInstance.put(`/user/update/${userId}`, payload),
+    uploadProfilePicture: (userId, file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return axiosInstance.post(`/user/${userId}/profile-picture`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+    },
     getUser: (id) => axiosInstance.get(`/user/get/${id}`),
     getUserMeasurements: (id) => axiosInstance.get(`/user/measurements/${id}`),
     addUserMeasurements: (payload) => axiosInstance.post(`/user/measurements`, payload),

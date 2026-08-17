@@ -4,6 +4,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import Button from "@/components/button";
 import { estimateMeasurementsWithMoveNet } from "@/lib/ai/movenetEstimator";
+import { ImageServices } from "@/services/images";
+
+const REFERENCE_PHOTO_LABELS = [
+  { value: "SIDE_VIEW", label: "Side View" },
+  { value: "CLOSE_UP", label: "Close-up" },
+];
 
 const CALIBRATION_OPTIONS = [
   { value: "height", label: "Use Height" },
@@ -87,8 +93,16 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [lastDiagnostics, setLastDiagnostics] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
 
+  // Supplementary photos (side view, close-ups) - stored as reference material for whoever
+  // reviews the measurements, not fed into the AI's math. A single front photo can't support
+  // real circumference math anyway (see the calibration help panel); these just give a human
+  // reviewer more to look at.
+  const [referencePhotos, setReferencePhotos] = useState([]); // { id, label, status, previewUrl, imageId }
+  const [referenceLabel, setReferenceLabel] = useState("SIDE_VIEW");
+
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
+  const referenceInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const libraryInputRef = useRef(null);
 
@@ -104,6 +118,15 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imagePreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      referencePhotos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+    };
+    // Only run on unmount - referencePhotos changes on every add/remove, we don't want to
+    // revoke earlier photos' URLs on every render, only ones still present when this unmounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const markerPixelWidth = useMemo(() => {
     if (markerPoints.length !== 2) return "";
@@ -202,6 +225,48 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
       });
     } catch (error) {
       toast.error(error?.message || "Unable to read selected image.");
+    }
+  };
+
+  const handleReferencePhotoChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const id = `${Date.now()}-${Math.random()}`;
+    const previewUrl = URL.createObjectURL(file);
+    const label = REFERENCE_PHOTO_LABELS.find((l) => l.value === referenceLabel)?.label || "Reference";
+
+    setReferencePhotos((current) => [...current, { id, label, status: "uploading", previewUrl }]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("imageType", "MEASUREMENT_REFERENCE");
+      formData.append("description", label);
+      const response = await ImageServices.uploadCustomizationImages(formData);
+      setReferencePhotos((current) =>
+        current.map((photo) =>
+          photo.id === id ? { ...photo, status: "done", imageId: response?.data?.imageId } : photo
+        )
+      );
+    } catch (error) {
+      setReferencePhotos((current) =>
+        current.map((photo) => (photo.id === id ? { ...photo, status: "error" } : photo))
+      );
+      toast.error(error?.response?.data?.message || "Failed to upload reference photo.");
+    }
+  };
+
+  const handleRemoveReferencePhoto = async (photo) => {
+    setReferencePhotos((current) => current.filter((p) => p.id !== photo.id));
+    URL.revokeObjectURL(photo.previewUrl);
+    if (photo.imageId) {
+      try {
+        await ImageServices.deleteCustomizationImage(photo.imageId);
+      } catch {
+        // Non-fatal - it's already removed from the UI; worst case an orphaned S3 file.
+      }
     }
   };
 
@@ -450,6 +515,76 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
           )}
         </div>
       )}
+
+      <div className="mt-4 pt-4 border-t border-amber-200">
+        <p className="text-xs font-medium text-gray-700">
+          Reference Photos <span className="font-normal text-gray-500">(optional)</span>
+        </p>
+        <p className="mt-0.5 text-[11px] text-gray-500">
+          A side view or a close-up of a specific area (waist, sleeve, etc.) helps whoever
+          reviews your measurements catch anything the front photo alone can&apos;t show. These
+          are attached as reference only - they don&apos;t change the numbers above.
+        </p>
+
+        <input
+          ref={referenceInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleReferencePhotoChange}
+        />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select
+            value={referenceLabel}
+            onChange={(event) => setReferenceLabel(event.target.value)}
+            className="rounded-md border border-gray-300 px-2 py-1.5 text-xs bg-white"
+          >
+            {REFERENCE_PHOTO_LABELS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            className="border border-gray-300 bg-white text-gray-700 rounded-md text-xs px-3 py-1.5"
+            onClick={() => referenceInputRef.current?.click()}
+          >
+            + Add Photo
+          </Button>
+        </div>
+
+        {referencePhotos.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            {referencePhotos.map((photo) => (
+              <div key={photo.id} className="relative w-20">
+                <div
+                  className={`h-20 w-20 rounded-md border overflow-hidden bg-white ${
+                    photo.status === "error" ? "border-red-300" : "border-gray-200"
+                  }`}
+                >
+                  <img
+                    src={photo.previewUrl}
+                    alt={photo.label}
+                    className={`h-full w-full object-cover ${photo.status === "uploading" ? "opacity-50" : ""}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveReferencePhoto(photo)}
+                  className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-gray-700 text-white text-xs leading-none flex items-center justify-center hover:bg-gray-900"
+                  aria-label={`Remove ${photo.label} photo`}
+                >
+                  &times;
+                </button>
+                <p className="mt-1 text-[10px] text-center text-gray-500 truncate">
+                  {photo.status === "uploading" ? "Uploading..." : photo.status === "error" ? "Failed" : photo.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {lastDiagnostics && (
         <div className="mt-3 rounded-md border border-gray-200 bg-white p-2 text-[11px] text-gray-600">

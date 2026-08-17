@@ -13,4 +13,6 @@ export const ImageServices = {
     }),
   deleteCustomizationImage: (imageId) =>
     axiosInstance.delete(`/api/images/delete/${imageId}`),
+  listMyImages: (imageType) =>
+    axiosInstance.get(`/api/images/mine${imageType ? `?imageType=${imageType}` : ""}`),
 };
