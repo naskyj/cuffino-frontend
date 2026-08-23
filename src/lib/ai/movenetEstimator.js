@@ -90,12 +90,23 @@ const ensureDetector = async () => {
  * actual person. MEN/WOMEN get adjusted multipliers; CHILDREN keeps the neutral set since child
  * body proportions vary enough by age that a single adjustment would likely do more harm than
  * good - flagged as lower-confidence for children in the returned diagnostics instead.
+ *
+ * waist/hips/neck/thigh were previously roughly half of realistic adult anthropometric ratios
+ * (e.g. neck: 0.37 x an ~16in shoulder width produced a ~6in "neck", which is not a real neck
+ * size for anyone) - caught 2026-08-23 by finally running this against a real full-body photo
+ * for the first time (every prior verification of this feature had tested the surrounding
+ * plumbing - upload, consent, calibration switching - never an actual detection+math run).
+ * Corrected against standard proportions: waist/hips/thigh scale off hipWidth (frontal hip
+ * keypoint distance), bust/neck/bicep/wrist scale off shoulderWidth (bideltoid keypoint
+ * distance), preserving each body type's original relative shape (e.g. WOMEN's hips-vs-waist
+ * spread) by applying the same correction factor within a field across all four sets rather
+ * than re-deriving each type's numbers independently.
  */
 const RATIO_SETS = {
-  DEFAULT: { bust: 1.95, waist: 1.05, hips: 1.4, neck: 0.37, thigh: 0.72, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
-  MEN: { bust: 2.0, waist: 1.1, hips: 1.32, neck: 0.4, thigh: 0.72, calf: 0.68, bicep: 0.72, wrist: 0.37, ankle: 0.72 },
-  WOMEN: { bust: 1.92, waist: 0.95, hips: 1.45, neck: 0.35, thigh: 0.74, calf: 0.68, bicep: 0.65, wrist: 0.35, ankle: 0.72 },
-  CHILDREN: { bust: 1.95, waist: 1.05, hips: 1.4, neck: 0.37, thigh: 0.72, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
+  DEFAULT: { bust: 1.95, waist: 2.30, hips: 2.80, neck: 0.90, thigh: 1.60, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
+  MEN: { bust: 2.0, waist: 2.40, hips: 2.65, neck: 0.97, thigh: 1.60, calf: 0.68, bicep: 0.72, wrist: 0.37, ankle: 0.72 },
+  WOMEN: { bust: 1.92, waist: 2.10, hips: 2.90, neck: 0.85, thigh: 1.65, calf: 0.68, bicep: 0.65, wrist: 0.35, ankle: 0.72 },
+  CHILDREN: { bust: 1.95, waist: 2.30, hips: 2.80, neck: 0.90, thigh: 1.60, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
 };
 
 const getRatios = (bodyType) => RATIO_SETS[bodyType] || RATIO_SETS.DEFAULT;
