@@ -43,12 +43,13 @@ const loadImageElement = (src) =>
   });
 
 const buildAiNote = (diagnostics) => {
-  const base = `AI estimate (MoveNet Thunder): confidence ${diagnostics.keypointConfidence}/1, pixelsPerInch ${diagnostics.pixelsPerInch}.`;
+  const base = `AI estimate (MoveNet Thunder): detection quality ${diagnostics.keypointConfidence}/1, pixelsPerInch ${diagnostics.pixelsPerInch}.`;
   const calibrationNote =
     diagnostics.calibrationMode === "marker"
       ? `Calibration: reference marker (${diagnostics.markerWidthInches}in / ${diagnostics.markerPixelWidth}px).`
       : `Calibration: height (${diagnostics.calibrationQuality === "reduced" ? "reduced confidence - face not clearly visible" : "good"}).`;
-  return `${base} ${calibrationNote} Please verify manually.`;
+  const consentNote = `Customer consented to AI photo analysis at ${new Date().toLocaleString()}.`;
+  return `${base} ${calibrationNote} ${consentNote} Please verify manually.`;
 };
 
 const CALIBRATION_HELP = {
@@ -92,6 +93,7 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [detectedKeypoints, setDetectedKeypoints] = useState(null);
   const [lastDiagnostics, setLastDiagnostics] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [consentGiven, setConsentGiven] = useState(false);
 
   // Supplementary photos (side view, close-ups) - stored as reference material for whoever
   // reviews the measurements, not fed into the AI's math. A single front photo can't support
@@ -135,10 +137,10 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   }, [markerPoints]);
 
   const canEstimate = useMemo(() => {
-    if (!imageInfo) return false;
+    if (!imageInfo || !consentGiven) return false;
     if (calibrationMode === "marker") return markerPoints.length === 2;
     return true;
-  }, [imageInfo, calibrationMode, markerPoints]);
+  }, [imageInfo, consentGiven, calibrationMode, markerPoints]);
 
   const draw = (info, points, keypoints) => {
     const canvas = canvasRef.current;
@@ -286,6 +288,11 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const handleEstimate = async () => {
     if (!imageInfo) {
       toast.error("Please upload a clear front full-body image first.");
+      return;
+    }
+
+    if (!consentGiven) {
+      toast.error("Please confirm you consent to AI analysis of your photo first.");
       return;
     }
 
@@ -588,11 +595,28 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
 
       {lastDiagnostics && (
         <div className="mt-3 rounded-md border border-gray-200 bg-white p-2 text-[11px] text-gray-600">
-          Confidence: {lastDiagnostics.keypointConfidence}/1
+          {/* "Detection quality," not "measurement confidence" - this reflects how clearly the
+              AI could see your joints in the photo, not how accurate the resulting numbers are.
+              Nothing here is a validated accuracy percentage. */}
+          Detection quality: {lastDiagnostics.keypointConfidence}/1
           {lastDiagnostics.calibrationQuality === "reduced" &&
             " - face not clearly visible, height calibration is a rougher estimate"}
         </div>
       )}
+
+      <label className="mt-3 flex items-start gap-2 text-xs text-gray-700">
+        <input
+          type="checkbox"
+          checked={consentGiven}
+          onChange={(event) => setConsentGiven(event.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          I consent to this photo being analyzed by AI to estimate my measurements. The photo
+          and its estimated measurements are stored to support my order and reviewed by Cuffino
+          staff/tailors as needed.
+        </span>
+      </label>
 
       <div className="pt-3">
         <Button

@@ -100,6 +100,39 @@ const RATIO_SETS = {
 
 const getRatios = (bodyType) => RATIO_SETS[bodyType] || RATIO_SETS.DEFAULT;
 
+// Quality gate run before AI processing, not after - the PRD's "FAIL -> explain -> guide ->
+// retake" flow. Brightness is the one lighting/framing check that's actually reliable to compute
+// client-side from pixel data alone; things like "multiple people in frame" aren't checkable
+// with a SINGLEPOSE model (it only ever returns one pose, by construction) so aren't attempted
+// here rather than faked.
+const MIN_AVG_BRIGHTNESS = 40; // 0-255 scale
+const MAX_AVG_BRIGHTNESS = 240;
+const BRIGHTNESS_SAMPLE_SIZE = 64; // downscaled - average brightness doesn't need full resolution
+
+const computeAverageBrightness = (imageElement) => {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = BRIGHTNESS_SAMPLE_SIZE;
+    canvas.height = BRIGHTNESS_SAMPLE_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(imageElement, 0, 0, BRIGHTNESS_SAMPLE_SIZE, BRIGHTNESS_SAMPLE_SIZE);
+    const { data } = ctx.getImageData(0, 0, BRIGHTNESS_SAMPLE_SIZE, BRIGHTNESS_SAMPLE_SIZE);
+    let total = 0;
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      // Perceptual luminance weighting, not a flat RGB average.
+      total += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      count += 1;
+    }
+    return count ? total / count : null;
+  } catch (error) {
+    // Canvas can be tainted in rare cross-origin cases - skip the check rather than block
+    // estimation over something unrelated to actual photo quality.
+    return null;
+  }
+};
+
 export const estimateMeasurementsWithMoveNet = async ({
   imageElement,
   heightInches,
@@ -124,6 +157,20 @@ export const estimateMeasurementsWithMoveNet = async ({
     }
     if (!Number.isFinite(markerPixels) || markerPixels <= 1) {
       throw new Error("Please mark both ends of your reference object on the photo.");
+    }
+  }
+
+  const avgBrightness = computeAverageBrightness(imageElement);
+  if (avgBrightness !== null) {
+    if (avgBrightness < MIN_AVG_BRIGHTNESS) {
+      throw new Error(
+        "Photo appears too dark. Retake in better lighting - a well-lit room or daylight near a window works best."
+      );
+    }
+    if (avgBrightness > MAX_AVG_BRIGHTNESS) {
+      throw new Error(
+        "Photo appears overexposed or washed out. Retake with less direct light, or move away from a bright background."
+      );
     }
   }
 
@@ -317,6 +364,7 @@ export const estimateMeasurementsWithMoveNet = async ({
       markerPixelWidth: calibrationMode === "marker" ? round1(markerPixels) : null,
       keypointConfidence: round1(confidence),
       perKeypointConfidence,
+      averageBrightness: round1(avgBrightness),
     },
   };
 };

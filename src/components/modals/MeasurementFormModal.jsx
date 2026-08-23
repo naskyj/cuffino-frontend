@@ -23,6 +23,12 @@ const BODY_TYPE_OPTIONS = [
   { key: "Children", value: "CHILDREN" },
 ];
 
+const FIT_PREFERENCE_OPTIONS = [
+  { key: "Slim - closer to the body", value: "SLIM" },
+  { key: "Regular - standard room to move", value: "REGULAR" },
+  { key: "Loose - extra room throughout", value: "LOOSE" },
+];
+
 const MeasurementFormModal = ({
   isVisible,
   onClose,
@@ -118,6 +124,9 @@ const MeasurementFormModal = ({
     rise: "",
     ankleCircumference: "",
     garmentLength: "",
+    fitPreference: "REGULAR",
+    aiConfidence: "",
+    measurementSource: "MANUAL",
     additionalNotes: "",
     // additionalProp1: "",
     // additionalProp2: "",
@@ -265,6 +274,11 @@ const MeasurementFormModal = ({
         rise: parseFloat(selectedMeasurement.rise) || 0,
         ankleCircumference: parseFloat(selectedMeasurement.ankleCircumference) || 0,
         garmentLength: parseFloat(selectedMeasurement.garmentLength) || 0,
+        // Fit preference isn't part of a saved body profile - it's an order-time choice, so it
+        // isn't offered in "select existing" mode yet; defaults to REGULAR here. Fast-follow:
+        // add a fit-preference selector to this mode too.
+        fitPreference: "REGULAR",
+        measurementSource: "MANUAL",
         additionalNotes: selectedMeasurement.additionalNotes || "",
         customFields: selectedMeasurement.customFields || {},
         customizations: [],
@@ -315,6 +329,9 @@ const MeasurementFormModal = ({
           rise: parseFloat(values.rise) || 0,
           ankleCircumference: parseFloat(values.ankleCircumference) || 0,
           garmentLength: parseFloat(values.garmentLength) || 0,
+          fitPreference: values.fitPreference || "REGULAR",
+          aiConfidence: values.aiConfidence !== "" ? parseFloat(values.aiConfidence) : null,
+          measurementSource: values.measurementSource || "MANUAL",
           additionalNotes: values.additionalNotes || "",
           // customFields: {
           //   additionalProp1: values.additionalProp1 || "",
@@ -533,12 +550,20 @@ const MeasurementFormModal = ({
                   <Form className="space-y-[20px]">
                     <AiMeasurementAssistant
                       bodyType={formik.values.bodyType}
-                      onApply={({ measurements, aiNote }) => {
+                      onApply={({ measurements, aiNote, diagnostics }) => {
                         Object.entries(measurements).forEach(([field, value]) => {
                           if (value !== null && value !== undefined) {
                             formik.setFieldValue(field, value.toString());
                           }
                         });
+
+                        formik.setFieldValue("measurementSource", "AI_ASSISTED");
+                        if (diagnostics?.keypointConfidence !== undefined) {
+                          formik.setFieldValue(
+                            "aiConfidence",
+                            diagnostics.keypointConfidence.toString()
+                          );
+                        }
 
                         if (!formik.values.additionalNotes?.includes("AI estimate")) {
                           formik.setFieldValue(
@@ -577,6 +602,20 @@ const MeasurementFormModal = ({
                           step="0.1"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm md:text-sm pb-1 font-semibold">Fit Preference</p>
+                      <FormikControl
+                        control="select"
+                        name="fitPreference"
+                        options={FIT_PREFERENCE_OPTIONS}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 pt-1">
+                        These are body measurements - the tailor adds room to fit based on your
+                        choice here.
+                      </p>
                     </div>
 
                     {/* Body Measurements */}
