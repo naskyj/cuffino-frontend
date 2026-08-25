@@ -19,6 +19,19 @@ const CALIBRATION_OPTIONS = [
 const MAX_DISPLAY_WIDTH = 420;
 const MAX_DISPLAY_HEIGHT = 620;
 
+// The first estimate in a session downloads a several-MB AI model fresh from Google's model
+// hub - on a slow connection (observed as low as ~450KB/s from real tester feedback) that alone
+// can take well over 20 seconds, and until now the button just said "Estimating..." with no
+// indication anything was still happening or how long to expect, which read as frozen/broken.
+const ESTIMATE_SLOW_HINT_MS = 6000;
+const ESTIMATE_TIMEOUT_MS = 60000;
+
+const withTimeout = (promise, ms, message) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+
 const SKELETON_EDGES = [
   ["left_shoulder", "right_shoulder"],
   ["left_shoulder", "left_elbow"],
@@ -93,6 +106,7 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [detectedKeypoints, setDetectedKeypoints] = useState(null);
   const [lastDiagnostics, setLastDiagnostics] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [estimatingLabel, setEstimatingLabel] = useState("Estimating...");
   const [consentGiven, setConsentGiven] = useState(false);
 
   // Supplementary photos (side view, close-ups) - stored as reference material for whoever
@@ -312,16 +326,26 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
       }
     }
 
+    let slowHintTimer;
     try {
       setIsEstimating(true);
-      const result = await estimateMeasurementsWithMoveNet({
-        imageElement: imageInfo.element,
-        calibrationMode,
-        heightInches: Number(heightInches),
-        markerWidthInches: Number(markerWidthInches),
-        markerPixelWidth: Number(markerPixelWidth),
-        bodyType,
-      });
+      setEstimatingLabel("Estimating...");
+      slowHintTimer = setTimeout(() => {
+        setEstimatingLabel("Still working - downloading the AI model can take longer on slower connections...");
+      }, ESTIMATE_SLOW_HINT_MS);
+
+      const result = await withTimeout(
+        estimateMeasurementsWithMoveNet({
+          imageElement: imageInfo.element,
+          calibrationMode,
+          heightInches: Number(heightInches),
+          markerWidthInches: Number(markerWidthInches),
+          markerPixelWidth: Number(markerPixelWidth),
+          bodyType,
+        }),
+        ESTIMATE_TIMEOUT_MS,
+        "This is taking much longer than expected, likely a slow connection while the AI model downloads. Please check your connection and try again."
+      );
 
       setDetectedKeypoints(result.keypoints);
       setLastDiagnostics(result.diagnostics);
@@ -345,7 +369,9 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
     } catch (error) {
       toast.error(error?.message || "Unable to estimate measurements from the image.");
     } finally {
+      clearTimeout(slowHintTimer);
       setIsEstimating(false);
+      setEstimatingLabel("Estimating...");
     }
   };
 
@@ -628,6 +654,9 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
         >
           {isEstimating ? "Estimating..." : "Estimate with AI"}
         </Button>
+        {isEstimating && estimatingLabel !== "Estimating..." && (
+          <p className="mt-2 text-xs text-gray-600">{estimatingLabel}</p>
+        )}
       </div>
     </div>
   );
