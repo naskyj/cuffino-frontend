@@ -10,12 +10,12 @@ import { FiShoppingCart } from "react-icons/fi";
 import SideBar from "../reusables/sideBar";
 import { FaRegUser } from "react-icons/fa6";
 import { IoSearch } from "react-icons/io5";
-import { ProductServices } from "@/services/product";
 import { CartServices } from "@/services/cart";
 import { useRouter } from "next/navigation";
 import useAuth from "@/core/zustand/auth.store";
 import useUtility from "@/core/zustand/utility";
 import { useQuery } from "@tanstack/react-query";
+import { useCategories } from "@/react-query/useCategories";
 
 const playFair = Playfair_Display({
   subsets: ["latin"],
@@ -30,37 +30,17 @@ const MobileNavbar = ({
   const { loggedIn, user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const { totalCartItems, setTotalCartItems } = useUtility();
 
-  // Fetch categories from API
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const response = await ProductServices.getAllCategories();
-      if (response.data) {
-        const categoryData = response.data;
-
-        // Transform API data to simple array format for mobile sidebar
-        const categoryItems = categoryData.map((category) => ({
-          id: category.categoryId,
-          name: category.categoryName,
-          link: `/shop?category=${category.categoryName}`,
-        }));
-
-        setCategories(categoryItems);
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      // Fallback to empty array if API fails
-      setCategories([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: rawCategories = [], isLoading: loading } = useCategories();
+  // Transform the shared raw category data into the simple array format the mobile sidebar wants.
+  const categories = rawCategories.map((category) => ({
+    id: category.categoryId,
+    name: category.categoryName,
+    link: `/shop?category=${category.categoryName}`,
+  }));
 
   // Fetch cart and update totalCartItems
   const getCart = useQuery({
@@ -86,7 +66,6 @@ const MobileNavbar = ({
 
   useEffect(() => {
     setMounted(true);
-    fetchCategories();
   }, []);
 
   useEffect(() => {

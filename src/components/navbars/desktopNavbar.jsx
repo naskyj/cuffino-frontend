@@ -10,11 +10,11 @@ import { FaArrowRight } from "react-icons/fa";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { FaRegUser } from "react-icons/fa";
-import { ProductServices } from "@/services/product";
 import { CartServices } from "@/services/cart";
 import useAuth from "@/core/zustand/auth.store";
 import useUtility from "@/core/zustand/utility";
 import { useQuery } from "@tanstack/react-query";
+import { useCategories } from "@/react-query/useCategories";
 
 const playFair = Playfair_Display({
   subsets: ["latin"],
@@ -30,8 +30,6 @@ const DesktopNavbar = ({
   const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const searchRef = useRef(null);
   const { loggedIn, user } = useAuth();
 
@@ -46,30 +44,12 @@ const DesktopNavbar = ({
   const navLinkClass =
     "font-normal text-lg hover:font-semibold transition-[font-weight] duration-200 ease-out";
 
-  // Fetch categories from API
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const response = await ProductServices.getAllCategories();
-      if (response.data) {
-        const categoryData = response.data;
-
-        // Keep dropdown payload simple and route from menu onClick handler.
-        const collectionItems = categoryData.map((category) => ({
-          key: category.categoryName,
-          label: category.categoryName,
-        }));
-
-        setCategories(collectionItems);
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      // Fallback to empty array if API fails
-      setCategories([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: rawCategories = [] } = useCategories();
+  // Keep dropdown payload simple and route from menu onClick handler.
+  const categories = rawCategories.map((category) => ({
+    key: category.categoryName,
+    label: category.categoryName,
+  }));
 
   // Fetch cart and update totalCartItems
   const getCart = useQuery({
@@ -95,7 +75,6 @@ const DesktopNavbar = ({
 
   useEffect(() => {
     setMounted(true);
-    fetchCategories();
   }, []);
 
   useEffect(() => {
