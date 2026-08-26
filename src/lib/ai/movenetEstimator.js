@@ -96,17 +96,46 @@ const ensureDetector = async () => {
  * size for anyone) - caught 2026-08-23 by finally running this against a real full-body photo
  * for the first time (every prior verification of this feature had tested the surrounding
  * plumbing - upload, consent, calibration switching - never an actual detection+math run).
- * Corrected against standard proportions: waist/hips/thigh scale off hipWidth (frontal hip
- * keypoint distance), bust/neck/bicep/wrist scale off shoulderWidth (bideltoid keypoint
- * distance), preserving each body type's original relative shape (e.g. WOMEN's hips-vs-waist
- * spread) by applying the same correction factor within a field across all four sets rather
- * than re-deriving each type's numbers independently.
+ *
+ * That first fix (2026-08-23) used textbook anthropometric proportions, not real data. A second
+ * pass (2026-08-25), against two more real photos with real tailor-measured ground truth
+ * (hips/thigh/neck/bicep/waist confirmed as genuine circumferences, not garment-draft half
+ * measurements), showed the textbook ratios were STILL roughly half of what was needed - e.g.
+ * hips needed ~5.16x hipWidth for MEN, not 2.65x. Root cause traced further than the ratio table
+ * itself: the raw hipWidth/shoulderWidth keypoint distances these ratios multiply are themselves
+ * running low, most likely because a single 2D front photo has no way to see front-to-back body
+ * depth, which materially affects circumference - MoveNet's joint keypoints capture frontal width
+ * only, not girth. Diagnostic detail: for both photos, no plausible real height could reconcile
+ * the shoulder-width gap alone (required implied heights of ~87in and ~102in), and hips required
+ * an even less plausible implied height than shoulders - ruling out "just a wrong height guess"
+ * and confirming hips/waist/thigh/neck/bicep carry error beyond whatever the shoulder/hip
+ * calibration itself contributes. These ratios are now fit directly to close that combined gap
+ * (calibration error + width-vs-circumference error folded into one empirical multiplier), since
+ * the two error sources can't be cleanly separated without a marker-calibrated (known-object-size)
+ * real photo, which wasn't available for this pass. bust/calf/wrist/ankle were left alone - no
+ * confidently-interpretable real ground truth was available for them this pass (bust's closest
+ * real analog, "Chest," was ambiguous between a full circumference and a half/draft measurement
+ * on both sheets, so wasn't used to avoid recalibrating against a guess).
+ *
+ * n=2 real people, both apparently adult men - MEN's values are the direct empirical fit; DEFAULT/
+ * WOMEN/CHILDREN are scaled by the same per-field correction factor applied to MEN's prior values,
+ * preserving each set's existing relative shape rather than fitting them independently (no real
+ * data for those categories yet). Expect further tuning as more real photos come in - flagged in
+ * WORK_LOG.md as a small-sample calibration, not a settled result.
+ *
+ * calf is derived from thigh (calf = thigh x calfRatio), not from hipWidth directly - roughly
+ * doubling the thigh ratio above without touching calf's own ratio would have silently doubled
+ * calf (and, cascading further, ankle) right along with it, even though there's no real ground
+ * truth for either in this pass. calfRatio is reduced here by the same ~2.06x factor thigh grew
+ * by, specifically to hold calf/ankle's *output values* steady at their pre-existing (untouched,
+ * separately-plausible) numbers rather than silently inflating them as a side effect of a fix
+ * aimed at thigh.
  */
 const RATIO_SETS = {
-  DEFAULT: { bust: 1.95, waist: 2.30, hips: 2.80, neck: 0.90, thigh: 1.60, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
-  MEN: { bust: 2.0, waist: 2.40, hips: 2.65, neck: 0.97, thigh: 1.60, calf: 0.68, bicep: 0.72, wrist: 0.37, ankle: 0.72 },
-  WOMEN: { bust: 1.92, waist: 2.10, hips: 2.90, neck: 0.85, thigh: 1.65, calf: 0.68, bicep: 0.65, wrist: 0.35, ankle: 0.72 },
-  CHILDREN: { bust: 1.95, waist: 2.30, hips: 2.80, neck: 0.90, thigh: 1.60, calf: 0.68, bicep: 0.68, wrist: 0.36, ankle: 0.72 },
+  DEFAULT: { bust: 1.95, waist: 4.01, hips: 5.45, neck: 1.14, thigh: 3.30, calf: 0.33, bicep: 1.04, wrist: 0.36, ankle: 0.72 },
+  MEN: { bust: 2.0, waist: 4.18, hips: 5.16, neck: 1.23, thigh: 3.30, calf: 0.33, bicep: 1.10, wrist: 0.37, ankle: 0.72 },
+  WOMEN: { bust: 1.92, waist: 3.66, hips: 5.64, neck: 1.08, thigh: 3.41, calf: 0.33, bicep: 0.99, wrist: 0.35, ankle: 0.72 },
+  CHILDREN: { bust: 1.95, waist: 4.01, hips: 5.45, neck: 1.14, thigh: 3.30, calf: 0.33, bicep: 1.04, wrist: 0.36, ankle: 0.72 },
 };
 
 const getRatios = (bodyType) => RATIO_SETS[bodyType] || RATIO_SETS.DEFAULT;
