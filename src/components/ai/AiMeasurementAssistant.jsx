@@ -108,6 +108,17 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [isEstimating, setIsEstimating] = useState(false);
   const [estimatingLabel, setEstimatingLabel] = useState("Estimating...");
   const [consentGiven, setConsentGiven] = useState(false);
+  // "Take Photo" (capture="environment") only actually does anything different from "Choose
+  // from Library" on a device with an actual camera app to hand off to - on a laptop/desktop
+  // both buttons just open the same file picker, which reads as two confusing, redundant
+  // options rather than a real choice. Pointer type (coarse = touch, fine = mouse/trackpad) is
+  // a more reliable signal for this than screen width, since a real phone should keep both
+  // options regardless of orientation or window size.
+  const [canCapturePhoto, setCanCapturePhoto] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    setCanCapturePhoto(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
 
   // Supplementary photos (side view, close-ups) - stored as reference material for whoever
   // reviews the measurements, not fed into the AI's math. A single front photo can't support
@@ -503,6 +514,8 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
           <Button
             type="button"
             className="flex-1 border border-gray-300 bg-white text-gray-700 rounded-md"
+            title={canCapturePhoto ? undefined : "Not available on this device - use Choose from Library instead"}
+            disable={!canCapturePhoto}
             onClick={() => cameraInputRef.current?.click()}
           >
             Take Photo

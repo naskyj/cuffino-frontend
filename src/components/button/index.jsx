@@ -22,11 +22,13 @@ const Button = ({
   className = "",
   loadingClassName = "",
   onClick,
+  title,
 }) => {
   return (
     <button
       type={type}
       disabled={disable || loading}
+      title={title}
       //when importing Button into a component always specify the bg and color
       className={
         `dm-sans flex justify-center cursor-pointer items-center disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto overflow-hidden relative h-[49.36px]  text-[14.1px] font-semibold  px-[30px] py-[20px]
