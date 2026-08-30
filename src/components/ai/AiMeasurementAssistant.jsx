@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import Button from "@/components/button";
 import { estimateMeasurementsWithMoveNet } from "@/lib/ai/movenetEstimator";
+import { estimateHipWaistFromDepth } from "@/lib/ai/depthEstimator";
 import { ImageServices } from "@/services/images";
 
 const REFERENCE_PHOTO_LABELS = [
@@ -55,14 +56,17 @@ const loadImageElement = (src) =>
     image.src = src;
   });
 
-const buildAiNote = (diagnostics) => {
+const buildAiNote = (diagnostics, usedDepthEstimate) => {
   const base = `AI estimate (MoveNet Thunder): detection quality ${diagnostics.keypointConfidence}/1, pixelsPerInch ${diagnostics.pixelsPerInch}.`;
   const calibrationNote =
     diagnostics.calibrationMode === "marker"
       ? `Calibration: reference marker (${diagnostics.markerWidthInches}in / ${diagnostics.markerPixelWidth}px).`
       : `Calibration: height (${diagnostics.calibrationQuality === "reduced" ? "reduced confidence - face not clearly visible" : "good"}).`;
+  const depthNote = usedDepthEstimate
+    ? " Hip/waist used the side-photo depth measurement (more accurate than the front-only estimate)."
+    : "";
   const consentNote = `Customer consented to AI photo analysis at ${new Date().toLocaleString()}.`;
-  return `${base} ${calibrationNote} ${consentNote} Please verify manually.`;
+  return `${base} ${calibrationNote}${depthNote} ${consentNote} Please verify manually.`;
 };
 
 const CALIBRATION_HELP = {
@@ -127,11 +131,20 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [referencePhotos, setReferencePhotos] = useState([]); // { id, label, status, previewUrl, imageId }
   const [referenceLabel, setReferenceLabel] = useState("SIDE_VIEW");
 
+  // A DIFFERENT side photo from the ones above: this one IS fed into the AI (via
+  // depthEstimator.js) to measure hip/waist circumference from front-width + side-depth
+  // together, instead of guessing circumference from front width alone. Optional - if absent,
+  // hip/waist just fall back to the front-only ratio estimate, same as every other field.
+  const [sideImagePreviewUrl, setSideImagePreviewUrl] = useState("");
+  const [sideImageInfo, setSideImageInfo] = useState(null); // { element }
+
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const referenceInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const libraryInputRef = useRef(null);
+  const sideCameraInputRef = useRef(null);
+  const sideLibraryInputRef = useRef(null);
 
   const revokeCurrentPreview = () => {
     if (imagePreviewUrl) {
@@ -145,6 +158,39 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imagePreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (sideImagePreviewUrl) URL.revokeObjectURL(sideImagePreviewUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideImagePreviewUrl]);
+
+  const handleSideFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (sideImagePreviewUrl) URL.revokeObjectURL(sideImagePreviewUrl);
+
+    const url = URL.createObjectURL(file);
+    setSideImagePreviewUrl(url);
+
+    try {
+      const element = await loadImageElement(url);
+      setSideImageInfo({ element });
+    } catch (error) {
+      toast.error(error?.message || "Unable to read selected side photo.");
+      setSideImageInfo(null);
+    }
+  };
+
+  const handleRemoveSidePhoto = () => {
+    if (sideImagePreviewUrl) URL.revokeObjectURL(sideImagePreviewUrl);
+    setSideImagePreviewUrl("");
+    setSideImageInfo(null);
+    if (sideCameraInputRef.current) sideCameraInputRef.current.value = "";
+    if (sideLibraryInputRef.current) sideLibraryInputRef.current.value = "";
+  };
 
   useEffect(() => {
     return () => {
@@ -361,7 +407,27 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
       setDetectedKeypoints(result.keypoints);
       setLastDiagnostics(result.diagnostics);
 
-      const aiNote = buildAiNote(result.diagnostics);
+      // Hip/waist from front-width + side-depth (an ellipse cross-section) instead of a fixed
+      // front-only ratio - validated to cut error from ~12-24% to ~0.3-2.4% for hip (2026-08-25/
+      // 30). Only attempted in height calibration mode (marker mode's own scale isn't threaded
+      // through this path yet) and only if a side photo was provided; gracefully skipped
+      // otherwise so this never blocks the estimate the front photo alone already produced.
+      let usedDepthEstimate = false;
+      if (sideImageInfo && calibrationMode === "height") {
+        const depthResult = await estimateHipWaistFromDepth({
+          frontPose: { keypoints: result.keypoints },
+          frontImageElement: imageInfo.element,
+          sideImageElement: sideImageInfo.element,
+          heightInches: Number(heightInches),
+        });
+        if (depthResult) {
+          if (depthResult.hips != null) result.measurements.hips = Math.round(depthResult.hips * 10) / 10;
+          if (depthResult.waist != null) result.measurements.waist = Math.round(depthResult.waist * 10) / 10;
+          usedDepthEstimate = depthResult.hips != null || depthResult.waist != null;
+        }
+      }
+
+      const aiNote = buildAiNote(result.diagnostics, usedDepthEstimate);
       if (onApply) {
         onApply({
           measurements: result.measurements,
@@ -561,6 +627,71 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
           )}
         </div>
       )}
+
+      <div className="mt-4 pt-4 border-t border-amber-200">
+        <p className="text-xs font-medium text-gray-700">
+          Side Photo <span className="font-normal text-gray-500">(optional, but recommended)</span>
+        </p>
+        <p className="mt-0.5 text-[11px] text-gray-500">
+          A standing side profile (90 degrees to the camera, full body visible) lets the AI
+          measure your body&apos;s depth, not just its width - this substantially improves hip
+          and waist accuracy over the front photo alone. Unlike Reference Photos below, this one
+          is actually used in the AI&apos;s math.
+        </p>
+
+        <input
+          ref={sideCameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleSideFileChange}
+        />
+        <input
+          ref={sideLibraryInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleSideFileChange}
+        />
+
+        {sideImagePreviewUrl ? (
+          <div className="mt-2 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={sideImagePreviewUrl}
+              alt="Side profile preview"
+              className="h-24 w-24 rounded-md border border-gray-200 object-cover"
+            />
+            <Button
+              type="button"
+              className="border border-gray-300 bg-white text-gray-700 rounded-md"
+              onClick={handleRemoveSidePhoto}
+            >
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-2 flex gap-2">
+            <Button
+              type="button"
+              className="flex-1 border border-gray-300 bg-white text-gray-700 rounded-md"
+              title={canCapturePhoto ? undefined : "Not available on this device - use Choose from Library instead"}
+              disable={!canCapturePhoto}
+              onClick={() => sideCameraInputRef.current?.click()}
+            >
+              Take Photo
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 border border-gray-300 bg-white text-gray-700 rounded-md"
+              onClick={() => sideLibraryInputRef.current?.click()}
+            >
+              Choose from Library
+            </Button>
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 pt-4 border-t border-amber-200">
         <p className="text-xs font-medium text-gray-700">

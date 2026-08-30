@@ -58,7 +58,7 @@ const getKeypoint = (pose, name, minScore) => {
   return keypoint;
 };
 
-const ensureDetector = async () => {
+export const ensureDetector = async () => {
   if (!detectorPromise) {
     detectorPromise = (async () => {
       const tf = await import("@tensorflow/tfjs-core");
@@ -171,6 +171,14 @@ const computeAverageBrightness = (imageElement) => {
     // estimation over something unrelated to actual photo quality.
     return null;
   }
+};
+
+// Shared with depthEstimator.js, which needs a pose from the side photo too - reuses the same
+// lazily-loaded detector instead of standing up a second one.
+export const detectPose = async (imageElement) => {
+  const detector = await ensureDetector();
+  const poses = await detector.estimatePoses(imageElement, { maxPoses: 1, flipHorizontal: false });
+  return poses?.[0] ?? null;
 };
 
 export const estimateMeasurementsWithMoveNet = async ({
