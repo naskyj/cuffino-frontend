@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import Button from "@/components/button";
 import { estimateMeasurementsWithMoveNet } from "@/lib/ai/movenetEstimator";
-import { estimateHipWaistFromDepth } from "@/lib/ai/depthEstimator";
+import { estimateCircumferencesFromDepth } from "@/lib/ai/depthEstimator";
 import { ImageServices } from "@/services/images";
 
 const REFERENCE_PHOTO_LABELS = [
@@ -63,7 +63,7 @@ const buildAiNote = (diagnostics, usedDepthEstimate) => {
       ? `Calibration: reference marker (${diagnostics.markerWidthInches}in / ${diagnostics.markerPixelWidth}px).`
       : `Calibration: height (${diagnostics.calibrationQuality === "reduced" ? "reduced confidence - face not clearly visible" : "good"}).`;
   const depthNote = usedDepthEstimate
-    ? " Hip/waist used the side-photo depth measurement (more accurate than the front-only estimate)."
+    ? " Hip/waist/bust used the side-photo depth measurement (more accurate than the front-only estimate)."
     : "";
   const consentNote = `Customer consented to AI photo analysis at ${new Date().toLocaleString()}.`;
   return `${base} ${calibrationNote}${depthNote} ${consentNote} Please verify manually.`;
@@ -132,9 +132,9 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [referenceLabel, setReferenceLabel] = useState("SIDE_VIEW");
 
   // A DIFFERENT side photo from the ones above: this one IS fed into the AI (via
-  // depthEstimator.js) to measure hip/waist circumference from front-width + side-depth
+  // depthEstimator.js) to measure hip/waist/bust circumference from front-width + side-depth
   // together, instead of guessing circumference from front width alone. Optional - if absent,
-  // hip/waist just fall back to the front-only ratio estimate, same as every other field.
+  // hip/waist/bust just fall back to the front-only ratio estimate, same as every other field.
   const [sideImagePreviewUrl, setSideImagePreviewUrl] = useState("");
   const [sideImageInfo, setSideImageInfo] = useState(null); // { element }
 
@@ -407,14 +407,16 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
       setDetectedKeypoints(result.keypoints);
       setLastDiagnostics(result.diagnostics);
 
-      // Hip/waist from front-width + side-depth (an ellipse cross-section) instead of a fixed
-      // front-only ratio - validated to cut error from ~12-24% to ~0.3-2.4% for hip (2026-08-25/
-      // 30). Only attempted in height calibration mode (marker mode's own scale isn't threaded
-      // through this path yet) and only if a side photo was provided; gracefully skipped
-      // otherwise so this never blocks the estimate the front photo alone already produced.
+      // Hip/waist/bust from front-width + side-depth (an ellipse cross-section) instead of a
+      // fixed front-only ratio - validated to cut error from ~12-24% to ~0.3-2.4% for hip, and
+      // confirmed for bust at 2.1% error on a separate real person (2026-08-25 through
+      // 2026-09-06). Only attempted in height calibration mode (marker mode's own scale isn't
+      // threaded through this path yet) and only if a side photo was provided; gracefully
+      // skipped otherwise so this never blocks the estimate the front photo alone already
+      // produced.
       let usedDepthEstimate = false;
       if (sideImageInfo && calibrationMode === "height") {
-        const depthResult = await estimateHipWaistFromDepth({
+        const depthResult = await estimateCircumferencesFromDepth({
           frontPose: { keypoints: result.keypoints },
           frontImageElement: imageInfo.element,
           sideImageElement: sideImageInfo.element,
@@ -423,7 +425,8 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
         if (depthResult) {
           if (depthResult.hips != null) result.measurements.hips = Math.round(depthResult.hips * 10) / 10;
           if (depthResult.waist != null) result.measurements.waist = Math.round(depthResult.waist * 10) / 10;
-          usedDepthEstimate = depthResult.hips != null || depthResult.waist != null;
+          if (depthResult.bust != null) result.measurements.bust = Math.round(depthResult.bust * 10) / 10;
+          usedDepthEstimate = depthResult.hips != null || depthResult.waist != null || depthResult.bust != null;
         }
       }
 

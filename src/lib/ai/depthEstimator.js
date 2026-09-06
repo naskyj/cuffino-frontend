@@ -1,25 +1,41 @@
-// Hip and waist circumference from front width + side depth, combined as an ellipse cross-
-// section - a real accuracy improvement over the pure front-only ratio approach in
-// movenetEstimator.js, validated against two real people with real tailor measurements
-// (2026-08-25/30): hip error dropped from 12-24% to 0.3-2.4%; waist (only checkable for one of
-// the two people) came in at 14.5% error, still meaningfully better than the ratio method's
-// typical 20-45% miss on the same field.
+// Hip, waist, and bust circumference from front width + side depth, combined as an ellipse
+// cross-section - a real accuracy improvement over the pure front-only ratio approach in
+// movenetEstimator.js. Validated against real tailor measurements from real people
+// (2026-08-25 through 2026-09-06):
+//   - Hip: 12-24% error (ratio method) -> 0.3-2.4% error (this method), two real people.
+//   - Waist: 20-45% error (ratio method) -> 14.5% error (this method), checkable for only one of
+//     those two people (no real waist value was available for the other).
+//   - Bust: previously unvalidated (Section 19 - the two people above either had ambiguous or
+//     arm-obstructed chest data) - a third person with a clean, unobstructed side photo and a
+//     real chest measurement confirmed it works the same way as hip: 41.88in vs a real 41in
+//     (2.1% error), with the scan row visually confirmed clear of any arm interference. Hip/waist
+//     haven't yet been re-run against this third person.
 //
-// Why hip/waist only, not every circumference field: this needs a reliable WIDTH at the target
-// row (a real MoveNet keypoint pair) as well as a reliable DEPTH (from segmentation). Hip has a
-// direct keypoint pair. Waist doesn't, so its width is interpolated between shoulder and hip
-// keypoints - weaker, but still keypoint-anchored. Thigh was tried and rejected: it needs a
-// side-view depth reading low on the leg, where loose trousers drape away from the body and the
-// segmentation mask picks up fabric, not leg circumference - this produced 33-77% overestimates
-// on both real test subjects and is not shipped. Neck/bicep/wrist/calf/ankle stay on the ratio
-// method for the same reason (no direct keypoint pair to anchor a width, and no validated depth
-// row for them yet).
+// Why hip/waist/bust only, not every circumference field: this needs a reliable WIDTH at the
+// target row (a real MoveNet keypoint pair, or a decent interpolation between two) as well as a
+// reliable DEPTH (from segmentation). Hip has a direct keypoint pair. Waist and bust don't, so
+// their width is interpolated between shoulder and hip keypoints - weaker, but still
+// keypoint-anchored, and validated well enough to ship.
 //
-// A front-view width was also tried directly from the segmentation mask (matching how depth is
-// read from the side photo) and rejected: in a natural standing pose, the arms hang close enough
-// to the torso that the mask shows one fully connected blob with no gap to separate "torso" from
-// "torso + arms" - MoveNet's keypoints don't have this problem since they're trained to identify
-// specific joints, not just silhouette shape.
+// Explicitly tried and REJECTED, do not re-attempt without new test photos or a different
+// technique:
+//   - Thigh: the side-view depth reading at leg height picks up loose trouser fabric drape, not
+//     leg circumference - 33-77% overestimates on two real test subjects (2026-08-30).
+//   - Neck: the interpolated width at neck height picks up shoulder/collar along with the neck -
+//     58% and 83.5% overestimates on two real people (2026-08-30, 09-06). Not a tunable-parameter
+//     problem; the row/width approach doesn't isolate the neck the way it does the torso.
+//   - Bicep/wrist/calf/ankle (limb circumference via segmentation, width x pi as a circular
+//     diameter): tested at every point along the upper arm on three real people/poses (arms at
+//     sides, arms raised, hands in pockets) and got wildly wrong results (68-94in "bicep") every
+//     time, because in every photo collected so far the arm rests against the torso with no
+//     visible gap in the mask to separate them. This is a photo-pose requirement (arms held
+//     clearly away from the body), not something fixable in code - needs new test photos taken
+//     that way before attempting this technique again.
+//   - Front-view WIDTH directly from the segmentation mask (matching how depth is read from the
+//     side photo): in a natural standing pose the arms hang close enough to the torso that the
+//     mask shows one fully connected blob with no gap to separate "torso" from "torso + arms" -
+//     MoveNet's keypoints don't have this problem since they're trained to identify specific
+//     joints, not just silhouette shape, so width still comes from keypoints for every field.
 
 let segmenterPromise = null;
 
@@ -110,12 +126,12 @@ const segmentToMask = async (segmenter, imageElement) => {
 };
 
 /**
- * Computes hip and waist circumference from a front pose (already detected by the caller, so it
- * isn't run twice) plus a side photo (detected here). Returns null - never throws - if anything
- * needed isn't available, so a caller can always fall back to the ratio-based estimate instead
- * of blocking the whole "Estimate with AI" flow over this specific enhancement.
+ * Computes hip, waist, and bust circumference from a front pose (already detected by the caller,
+ * so it isn't run twice) plus a side photo (detected here). Returns null - never throws - if
+ * anything needed isn't available, so a caller can always fall back to the ratio-based estimate
+ * instead of blocking the whole "Estimate with AI" flow over this specific enhancement.
  */
-export const estimateHipWaistFromDepth = async ({ frontPose, frontImageElement, sideImageElement, heightInches }) => {
+export const estimateCircumferencesFromDepth = async ({ frontPose, frontImageElement, sideImageElement, heightInches }) => {
   try {
     const height = Number(heightInches);
     if (!Number.isFinite(height) || height <= 0) return null;
@@ -145,6 +161,11 @@ export const estimateHipWaistFromDepth = async ({ frontPose, frontImageElement, 
     // above the hip line (between the lowest rib and the top of the pelvis).
     const waistY = hipY - 0.35 * (hipY - shoulderY);
     const waistWidthPx = interpolate(waistY, shoulderY, hipY, shoulderWidthPx, hipWidthPx);
+
+    // Bust/chest line: no direct keypoint, approximated ~25% of the way down the shoulder-to-hip
+    // span (validated against a real chest measurement at 2.1% error - see module comment).
+    const bustY = shoulderY + 0.25 * (hipY - shoulderY);
+    const bustWidthPx = interpolate(bustY, shoulderY, hipY, shoulderWidthPx, hipWidthPx);
 
     const segmenter = await ensureSegmenter();
     const { detectPose } = await import("./movenetEstimator");
@@ -180,13 +201,20 @@ export const estimateHipWaistFromDepth = async ({ frontPose, frontImageElement, 
     const knownSideHipRow = sideHip && sideHip.score > 0.3 ? sideHip.y : null;
     const hips = measureCircumference(hipWidthPx, hipY, knownSideHipRow);
     const waist = measureCircumference(waistWidthPx, waistY, null);
+    const bust = measureCircumference(bustWidthPx, bustY, null);
 
-    if (hips == null && waist == null) return null;
+    if (hips == null && waist == null && bust == null) return null;
 
     return {
       hips,
       waist,
-      diagnostics: { method: "depth-ellipse", hipWidthSource: "keypoint", waistWidthSource: "keypoint-interpolated" },
+      bust,
+      diagnostics: {
+        method: "depth-ellipse",
+        hipWidthSource: "keypoint",
+        waistWidthSource: "keypoint-interpolated",
+        bustWidthSource: "keypoint-interpolated",
+      },
     };
   } catch (error) {
     // Any failure here (segmentation model load, pose detection on a poor side photo, etc.)
