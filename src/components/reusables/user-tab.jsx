@@ -2,7 +2,9 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import useAuth from "@/core/zustand/auth.store";
+import { NotificationServices } from "@/services/notifications";
 
 import {
   FiUser,
@@ -11,6 +13,7 @@ import {
   FiFileText,
   FiShoppingBag,
   FiHelpCircle,
+  FiBell,
 } from "react-icons/fi";
 import { GrMapLocation } from "react-icons/gr";
 
@@ -18,6 +21,9 @@ const navItems = [
   { href: "/user-profile", label: "Profile", icon: FiUser, slug: "user-profile" },
   { href: "/user-measurement", label: "Measurements", icon: FiFileText, slug: "user-measurement" },
   { href: "/user-orders", label: "Orders", icon: FiShoppingBag, slug: "user-orders" },
+  // /user-notification has existed as a page since before this, but nothing anywhere linked to
+  // it - it was only reachable by typing the URL.
+  { href: "/user-notification", label: "Notifications", icon: FiBell, slug: "user-notification" },
   { href: "/user-delivery-address", label: "Delivery Address", icon: GrMapLocation, slug: "user-delivery-address" },
   { href: "/user-support", label: "Support", icon: FiHelpCircle, slug: "user-support" },
   { href: "/user-setting", label: "Settings", icon: FiSettings, slug: "user-setting" },
@@ -28,6 +34,18 @@ export default function Usertab() {
   const { user, logout } = useAuth();
 
   const isActive = (slug) => pathname.includes(slug.toLowerCase());
+
+  // Only polled while signed in - an unauthenticated call would just 401 in a loop.
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: async () => {
+      const response = await NotificationServices.unreadCount();
+      return response?.data?.unreadCount ?? 0;
+    },
+    enabled: Boolean(user),
+    refetchInterval: 60_000,
+    retry: false,
+  });
 
   // Get user initials for avatar
   const getInitials = () => {
@@ -95,6 +113,15 @@ export default function Usertab() {
                         <Icon className={`w-4 h-4 ${active ? "text-white" : "text-gray-500"}`} />
                       </span>
                       <span className="font-medium text-sm">{item.label}</span>
+                      {item.slug === "user-notification" && unreadCount > 0 && (
+                        <span
+                          className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${
+                            active ? "bg-white text-primary" : "bg-primary text-white"
+                          }`}
+                        >
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );

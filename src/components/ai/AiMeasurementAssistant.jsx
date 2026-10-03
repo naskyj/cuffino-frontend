@@ -3,8 +3,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import Button from "@/components/button";
-import { estimateMeasurementsWithMoveNet } from "@/lib/ai/movenetEstimator";
+import { estimateMeasurementsWithMoveNet, detectPose } from "@/lib/ai/movenetEstimator";
 import { estimateCircumferencesFromDepth } from "@/lib/ai/depthEstimator";
+import { validateFrontPose, validateSidePose } from "@/lib/ai/poseValidation";
 import { ImageServices } from "@/services/images";
 
 const REFERENCE_PHOTO_LABELS = [
@@ -47,6 +48,74 @@ const SKELETON_EDGES = [
   ["right_hip", "right_knee"],
   ["right_knee", "right_ankle"],
 ];
+
+// Reference stance diagrams shown before capture - drawn in the same stick-figure style as the
+// green AI-detection overlay below (see SKELETON_EDGES) so the "target" pose visually matches
+// what the app shows you after you upload. Coordinates are hand-placed, not derived from a real
+// pose, purely to depict the target stance.
+const FRONT_POSE_POINTS = {
+  nose: { x: 50, y: 15 },
+  left_shoulder: { x: 38, y: 32 },
+  right_shoulder: { x: 62, y: 32 },
+  left_elbow: { x: 25, y: 55 },
+  right_elbow: { x: 75, y: 55 },
+  left_wrist: { x: 20, y: 78 },
+  right_wrist: { x: 80, y: 78 },
+  left_hip: { x: 42, y: 75 },
+  right_hip: { x: 58, y: 75 },
+  left_knee: { x: 40, y: 110 },
+  right_knee: { x: 60, y: 110 },
+  left_ankle: { x: 38, y: 145 },
+  right_ankle: { x: 62, y: 145 },
+};
+
+const SIDE_POSE_POINTS = {
+  nose: { x: 58, y: 15 },
+  left_shoulder: { x: 52, y: 32 },
+  left_elbow: { x: 48, y: 55 },
+  left_wrist: { x: 46, y: 78 },
+  left_hip: { x: 50, y: 75 },
+  left_knee: { x: 52, y: 110 },
+  left_ankle: { x: 54, y: 145 },
+};
+
+const SIDE_POSE_EDGES = [
+  ["left_shoulder", "left_elbow"],
+  ["left_elbow", "left_wrist"],
+  ["left_shoulder", "left_hip"],
+  ["left_hip", "left_knee"],
+  ["left_knee", "left_ankle"],
+];
+
+const PoseDiagram = ({ points, edges, label }) => (
+  <div className="flex flex-col items-center gap-1">
+    <svg viewBox="0 0 100 160" className="h-32 w-auto" aria-hidden="true">
+      <rect x="0" y="0" width="100" height="160" rx="6" fill="#fffbeb" stroke="#fde68a" />
+      {edges.map(([fromName, toName]) => {
+        const from = points[fromName];
+        const to = points[toName];
+        if (!from || !to) return null;
+        return (
+          <line
+            key={`${fromName}-${toName}`}
+            x1={from.x}
+            y1={from.y}
+            x2={to.x}
+            y2={to.y}
+            stroke="#16a34a"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        );
+      })}
+      <circle cx={points.nose.x} cy={points.nose.y} r="8" fill="#16a34a" />
+      {Object.entries(points).map(([name, point]) =>
+        name === "nose" ? null : <circle key={name} cx={point.x} cy={point.y} r="3" fill="#16a34a" />
+      )}
+    </svg>
+    <p className="text-[10px] font-medium text-gray-600">{label}</p>
+  </div>
+);
 
 const loadImageElement = (src) =>
   new Promise((resolve, reject) => {
@@ -109,6 +178,12 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
   const [imageInfo, setImageInfo] = useState(null); // { element, naturalWidth, naturalHeight, displayWidth, displayHeight, scale }
   const [detectedKeypoints, setDetectedKeypoints] = useState(null);
   const [lastDiagnostics, setLastDiagnostics] = useState(null);
+  // Pose check runs immediately on selecting a photo, not at "Estimate" time - so a photo that
+  // won't produce usable measurements gets rejected with a specific reason right away instead of
+  // after a 60-second model download. null = not checked yet, "checking" = in progress, otherwise
+  // { valid, reason } from validateFrontPose/validateSidePose.
+  const [frontPoseCheck, setFrontPoseCheck] = useState(null);
+  const [sidePoseCheck, setSidePoseCheck] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
   const [estimatingLabel, setEstimatingLabel] = useState("Estimating...");
   const [consentGiven, setConsentGiven] = useState(false);
@@ -171,6 +246,7 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
     if (!file) return;
 
     if (sideImagePreviewUrl) URL.revokeObjectURL(sideImagePreviewUrl);
+    setSidePoseCheck(null);
 
     const url = URL.createObjectURL(file);
     setSideImagePreviewUrl(url);
@@ -178,9 +254,16 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
     try {
       const element = await loadImageElement(url);
       setSideImageInfo({ element });
+      setSidePoseCheck("checking");
+      const pose = await detectPose(element);
+      const result = pose?.keypoints
+        ? validateSidePose(pose.keypoints)
+        : { valid: false, reason: "We couldn't detect a person clearly in this photo. Please retake in good lighting, full body visible." };
+      setSidePoseCheck(result);
     } catch (error) {
       toast.error(error?.message || "Unable to read selected side photo.");
       setSideImageInfo(null);
+      setSidePoseCheck(null);
     }
   };
 
@@ -188,6 +271,7 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
     if (sideImagePreviewUrl) URL.revokeObjectURL(sideImagePreviewUrl);
     setSideImagePreviewUrl("");
     setSideImageInfo(null);
+    setSidePoseCheck(null);
     if (sideCameraInputRef.current) sideCameraInputRef.current.value = "";
     if (sideLibraryInputRef.current) sideLibraryInputRef.current.value = "";
   };
@@ -209,9 +293,10 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
 
   const canEstimate = useMemo(() => {
     if (!imageInfo || !consentGiven) return false;
+    if (!frontPoseCheck || frontPoseCheck === "checking" || !frontPoseCheck.valid) return false;
     if (calibrationMode === "marker") return markerPoints.length === 2;
     return true;
-  }, [imageInfo, consentGiven, calibrationMode, markerPoints]);
+  }, [imageInfo, consentGiven, calibrationMode, markerPoints, frontPoseCheck]);
 
   const draw = (info, points, keypoints) => {
     const canvas = canvasRef.current;
@@ -274,6 +359,7 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
     setDetectedKeypoints(null);
     setLastDiagnostics(null);
     setMarkerPoints([]);
+    setFrontPoseCheck(null);
 
     const url = URL.createObjectURL(file);
     setImagePreviewUrl(url);
@@ -296,6 +382,16 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
         displayHeight,
         scale,
       });
+
+      setFrontPoseCheck("checking");
+      const pose = await detectPose(element);
+      const result = pose?.keypoints
+        ? validateFrontPose(pose.keypoints)
+        : { valid: false, reason: "We couldn't detect a person clearly in this photo. Please retake in good lighting, full body visible." };
+      setFrontPoseCheck(result);
+      if (!result.valid) {
+        toast.error(result.reason);
+      }
     } catch (error) {
       toast.error(error?.message || "Unable to read selected image.");
     }
@@ -362,6 +458,11 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
       return;
     }
 
+    if (!frontPoseCheck || frontPoseCheck === "checking" || !frontPoseCheck.valid) {
+      toast.error(frontPoseCheck?.reason || "Please wait for your photo to finish checking, or fix the issue it flagged, before estimating.");
+      return;
+    }
+
     if (!consentGiven) {
       toast.error("Please confirm you consent to AI analysis of your photo first.");
       return;
@@ -415,7 +516,7 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
       // skipped otherwise so this never blocks the estimate the front photo alone already
       // produced.
       let usedDepthEstimate = false;
-      if (sideImageInfo && calibrationMode === "height") {
+      if (sideImageInfo && sidePoseCheck?.valid && calibrationMode === "height") {
         const depthResult = await estimateCircumferencesFromDepth({
           frontPose: { keypoints: result.keypoints },
           frontImageElement: imageInfo.element,
@@ -555,6 +656,14 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
 
       <div className="pt-3">
         <label className="text-xs font-medium text-gray-700">Front photo</label>
+        <div className="mt-1.5 flex items-center gap-3 rounded-md border border-gray-200 bg-white p-2">
+          <PoseDiagram points={FRONT_POSE_POINTS} edges={SKELETON_EDGES} label="Stand like this" />
+          <p className="text-[11px] text-gray-600">
+            Face the camera directly, whole body in frame (head to feet), and hold your arms with
+            a visible gap from your sides - not resting against your body. We check this
+            automatically and won&apos;t accept a photo where we can&apos;t see it clearly.
+          </p>
+        </div>
         {/*
          * Two separate inputs rather than one relying on the OS's default file-picker chooser:
          * on iOS that default chooser reliably offers Camera + Photos + Files, but on Android
@@ -628,6 +737,17 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
               photo rather than trusting the numbers.
             </p>
           )}
+          {frontPoseCheck === "checking" && (
+            <p className="pt-1 text-[11px] text-gray-500">Checking your pose...</p>
+          )}
+          {frontPoseCheck && frontPoseCheck !== "checking" && !frontPoseCheck.valid && (
+            <p className="pt-1 text-[11px] font-medium text-red-600">
+              {frontPoseCheck.reason} You&apos;ll need to retake this photo before estimating.
+            </p>
+          )}
+          {frontPoseCheck && frontPoseCheck !== "checking" && frontPoseCheck.valid && (
+            <p className="pt-1 text-[11px] font-medium text-green-700">Pose looks good.</p>
+          )}
         </div>
       )}
 
@@ -641,6 +761,14 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
           and waist accuracy over the front photo alone. Unlike Reference Photos below, this one
           is actually used in the AI&apos;s math.
         </p>
+        <div className="mt-1.5 flex items-center gap-3 rounded-md border border-gray-200 bg-white p-2">
+          <PoseDiagram points={SIDE_POSE_POINTS} edges={SIDE_POSE_EDGES} label="Stand like this" />
+          <p className="text-[11px] text-gray-600">
+            Turn 90 degrees from the camera, whole body in frame (head to feet), arms relaxed at
+            your sides is fine here. We check this automatically - if we can&apos;t see your full
+            body clearly, we&apos;ll skip using this photo rather than risk a bad reading.
+          </p>
+        </div>
 
         <input
           ref={sideCameraInputRef}
@@ -659,20 +787,34 @@ export default function AiMeasurementAssistant({ onApply, bodyType }) {
         />
 
         {sideImagePreviewUrl ? (
-          <div className="mt-2 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={sideImagePreviewUrl}
-              alt="Side profile preview"
-              className="h-24 w-24 rounded-md border border-gray-200 object-cover"
-            />
-            <Button
-              type="button"
-              className="border border-gray-300 bg-white text-gray-700 rounded-md"
-              onClick={handleRemoveSidePhoto}
-            >
-              Remove
-            </Button>
+          <div className="mt-2">
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={sideImagePreviewUrl}
+                alt="Side profile preview"
+                className="h-24 w-24 rounded-md border border-gray-200 object-cover"
+              />
+              <Button
+                type="button"
+                className="border border-gray-300 bg-white text-gray-700 rounded-md"
+                onClick={handleRemoveSidePhoto}
+              >
+                Remove
+              </Button>
+            </div>
+            {sidePoseCheck === "checking" && (
+              <p className="pt-1 text-[11px] text-gray-500">Checking your pose...</p>
+            )}
+            {sidePoseCheck && sidePoseCheck !== "checking" && !sidePoseCheck.valid && (
+              <p className="pt-1 text-[11px] font-medium text-amber-700">
+                {sidePoseCheck.reason} This photo won&apos;t be used - your front photo alone
+                will still be estimated.
+              </p>
+            )}
+            {sidePoseCheck && sidePoseCheck !== "checking" && sidePoseCheck.valid && (
+              <p className="pt-1 text-[11px] font-medium text-green-700">Pose looks good.</p>
+            )}
           </div>
         ) : (
           <div className="mt-2 flex gap-2">

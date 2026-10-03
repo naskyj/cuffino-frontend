@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import useAuth from "@/core/zustand/auth.store";
 import { UserServices } from "@/services/user";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import AiMeasurementAssistant from "@/components/ai/AiMeasurementAssistant";
+import MeasurementPhotoUpload from "@/components/measurement/MeasurementPhotoUpload";
 
 const BODY_TYPE_OPTIONS = [
   { key: "Select body type", value: "" },
@@ -345,25 +345,9 @@ export default function UserMeasurement() {
           >
             {(formik) => (
               <Form className="space-y-6">
-                <AiMeasurementAssistant
-                  bodyType={formik.values.bodyType}
-                  onApply={({ measurements, aiNote }) => {
-                    Object.entries(measurements).forEach(([field, value]) => {
-                      if (value !== null && value !== undefined) {
-                        formik.setFieldValue(field, value.toString());
-                      }
-                    });
-
-                    if (!formik.values.additionalNotes?.includes("AI estimate")) {
-                      formik.setFieldValue(
-                        "additionalNotes",
-                        formik.values.additionalNotes
-                          ? `${formik.values.additionalNotes}\n${aiNote}`
-                          : aiNote
-                      );
-                    }
-                  }}
-                />
+                {/* Measurements are entered by hand; the photos below are reference material a
+                    tailor eyeballs against those numbers, not an input to any estimate. */}
+                <MeasurementPhotoUpload />
 
                 {/* Profile Name */}
                 <div className="bg-gray-50 rounded-lg p-4">

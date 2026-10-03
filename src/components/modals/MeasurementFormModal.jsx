@@ -14,7 +14,7 @@ import { ClipLoader } from "react-spinners";
 import CustomSelect from "../select";
 import { ProductServices } from "@/services/product";
 import CustomModal from "./index";
-import AiMeasurementAssistant from "@/components/ai/AiMeasurementAssistant";
+import MeasurementPhotoUpload from "@/components/measurement/MeasurementPhotoUpload";
 
 const BODY_TYPE_OPTIONS = [
   { key: "Select body type", value: "" },
@@ -548,33 +548,10 @@ const MeasurementFormModal = ({
               {(formik) => {
                 return (
                   <Form className="space-y-[20px]">
-                    <AiMeasurementAssistant
-                      bodyType={formik.values.bodyType}
-                      onApply={({ measurements, aiNote, diagnostics }) => {
-                        Object.entries(measurements).forEach(([field, value]) => {
-                          if (value !== null && value !== undefined) {
-                            formik.setFieldValue(field, value.toString());
-                          }
-                        });
-
-                        formik.setFieldValue("measurementSource", "AI_ASSISTED");
-                        if (diagnostics?.keypointConfidence !== undefined) {
-                          formik.setFieldValue(
-                            "aiConfidence",
-                            diagnostics.keypointConfidence.toString()
-                          );
-                        }
-
-                        if (!formik.values.additionalNotes?.includes("AI estimate")) {
-                          formik.setFieldValue(
-                            "additionalNotes",
-                            formik.values.additionalNotes
-                              ? `${formik.values.additionalNotes}\n${aiNote}`
-                              : aiNote
-                          );
-                        }
-                      }}
-                    />
+                    {/* Measurements are entered by hand - nothing here writes a measurement
+                        field or touches measurementSource/aiConfidence. The photos are reference
+                        material for whoever reviews the numbers. */}
+                    <MeasurementPhotoUpload />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-8">
                       <div>

@@ -1,156 +1,259 @@
 "use client";
 
 import React, { useState } from "react";
-import { FiBell, FiMail, FiTag, FiMessageSquare, FiUsers, FiActivity } from "react-icons/fi";
+import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  FiBell,
+  FiCreditCard,
+  FiPackage,
+  FiRotateCcw,
+  FiHelpCircle,
+  FiEdit3,
+} from "react-icons/fi";
 
-// Toggle Switch Component
-const ToggleSwitch = ({ id, checked, onChange }) => (
-  <label className="relative inline-flex items-center cursor-pointer">
-    <input
-      type="checkbox"
-      id={id}
-      checked={checked}
-      onChange={onChange}
-      className="sr-only peer"
-    />
-    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-  </label>
-);
+import { NotificationServices } from "@/services/notifications";
 
-// Notification Item Component
-const NotificationItem = ({ icon: Icon, title, description, id, checked, onChange }) => (
-  <div className="flex items-center justify-between py-4">
-    <div className="flex items-center gap-4">
-      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-        <Icon className="w-5 h-5 text-gray-500" />
-      </div>
-      <div>
-        <h6 className="text-sm font-medium text-gray-900">{title}</h6>
-        <p className="text-xs text-gray-500">{description}</p>
-      </div>
-    </div>
-    <ToggleSwitch id={id} checked={checked} onChange={onChange} />
-  </div>
-);
+// This page used to be a set of on/off toggles (mentions, follows, shares, weekly digest) held in
+// local state - they saved nowhere, nothing read them, and none of them corresponded to anything
+// Cuffino actually sends. It's now the real feed: order progress, payments and refunds, returns,
+// and support replies, served per-recipient from the backend.
+
+const PAGE_SIZE = 20;
+
+const TYPE_META = {
+  ORDER_PLACED: { icon: FiPackage, label: "Order", tint: "bg-blue-50 text-blue-600" },
+  ORDER_STATUS: { icon: FiPackage, label: "Order", tint: "bg-indigo-50 text-indigo-600" },
+  PAYMENT: { icon: FiCreditCard, label: "Payment", tint: "bg-green-50 text-green-600" },
+  RETURN: { icon: FiRotateCcw, label: "Return", tint: "bg-orange-50 text-orange-600" },
+  SUPPORT: { icon: FiHelpCircle, label: "Support", tint: "bg-purple-50 text-purple-600" },
+  MEASUREMENT: { icon: FiEdit3, label: "Measurement", tint: "bg-teal-50 text-teal-600" },
+  SYSTEM: { icon: FiBell, label: "Update", tint: "bg-gray-100 text-gray-600" },
+};
+
+const formatWhen = (iso) => {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+
+  const minutes = Math.floor((Date.now() - then.getTime()) / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h ago`;
+  if (minutes < 60 * 24 * 7) return `${Math.floor(minutes / (60 * 24))}d ago`;
+  return then.toLocaleString();
+};
 
 export default function UserNotification() {
-  const [notifications, setNotifications] = useState({
-    mentions: false,
-    follows: true,
-    shares: false,
-    messages: false,
-    sales: true,
-    news: false,
-    weekly: true,
-    unsubscribe: false,
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(0);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["notifications", { page, unreadOnly }],
+    queryFn: async () => {
+      const response = await NotificationServices.list({
+        page,
+        unreadOnly,
+        size: PAGE_SIZE,
+      });
+      return response?.data;
+    },
   });
 
-  const handleToggle = (key) => {
-    setNotifications(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+  const markRead = useMutation({
+    mutationFn: (id) => NotificationServices.markRead(id),
+    onSuccess: invalidate,
+  });
+
+  const markAllRead = useMutation({
+    mutationFn: () => NotificationServices.markAllRead(),
+    onSuccess: (response) => {
+      const count = response?.data?.markedRead ?? 0;
+      toast.success(count > 0 ? `Marked ${count} as read` : "Nothing left to mark");
+      invalidate();
+    },
+    onError: () => toast.error("Couldn't mark your notifications read"),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id) => NotificationServices.remove(id),
+    onSuccess: invalidate,
+    onError: () => toast.error("Couldn't remove that notification"),
+  });
+
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
+
+  const openNotification = (notification) => {
+    if (!notification.read) {
+      // Fire and forget - landing on the page the notification points at matters more than
+      // whether the read flag made it.
+      markRead.mutate(notification.notificationId);
+    }
+    if (notification.link) {
+      router.push(notification.link);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Account Notifications */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
+        <div className="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <FiBell className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Account Notifications</h2>
-              <p className="text-sm text-gray-500">Manage your account activity alerts</p>
+              <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
+              <p className="text-sm text-gray-500">
+                {unreadCount > 0
+                  ? `${unreadCount} unread`
+                  : "You're all caught up"}
+              </p>
             </div>
           </div>
-        </div>
 
-        <div className="p-6 divide-y divide-gray-100">
-          <NotificationItem
-            icon={FiUsers}
-            title="Mentions"
-            description="Get notified when someone mentions you"
-            id="mentions"
-            checked={notifications.mentions}
-            onChange={() => handleToggle('mentions')}
-          />
-          <NotificationItem
-            icon={FiUsers}
-            title="New Followers"
-            description="Get notified when someone follows you"
-            id="follows"
-            checked={notifications.follows}
-            onChange={() => handleToggle('follows')}
-          />
-          <NotificationItem
-            icon={FiActivity}
-            title="Activity Shares"
-            description="Get notified when someone shares your activity"
-            id="shares"
-            checked={notifications.shares}
-            onChange={() => handleToggle('shares')}
-          />
-          <NotificationItem
-            icon={FiMessageSquare}
-            title="Direct Messages"
-            description="Get notified when you receive a message"
-            id="messages"
-            checked={notifications.messages}
-            onChange={() => handleToggle('messages')}
-          />
-        </div>
-      </div>
-
-      {/* Marketing Notifications */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
-              <FiMail className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Marketing Notifications</h2>
-              <p className="text-sm text-gray-500">Stay updated with our latest offers</p>
-            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={unreadOnly}
+                onChange={(event) => {
+                  setUnreadOnly(event.target.checked);
+                  setPage(0);
+                }}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              Unread only
+            </label>
+            <button
+              type="button"
+              onClick={() => markAllRead.mutate()}
+              disabled={markAllRead.isPending || unreadCount === 0}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Mark all read
+            </button>
           </div>
         </div>
 
-        <div className="p-6 divide-y divide-gray-100">
-          <NotificationItem
-            icon={FiTag}
-            title="Sales & Promotions"
-            description="Be the first to know about sales and special offers"
-            id="sales"
-            checked={notifications.sales}
-            onChange={() => handleToggle('sales')}
-          />
-          <NotificationItem
-            icon={FiMail}
-            title="Company News"
-            description="Updates about our company and new features"
-            id="news"
-            checked={notifications.news}
-            onChange={() => handleToggle('news')}
-          />
-          <NotificationItem
-            icon={FiBell}
-            title="Weekly Digest"
-            description="Weekly summary of your account activity"
-            id="weekly"
-            checked={notifications.weekly}
-            onChange={() => handleToggle('weekly')}
-          />
-        </div>
-      </div>
+        {isLoading ? (
+          <div className="p-10 text-center text-sm text-gray-500">
+            Loading your notifications...
+          </div>
+        ) : isError ? (
+          <div className="p-10 text-center text-sm text-red-600">
+            We couldn&apos;t load your notifications. Please refresh and try again.
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="p-12 text-center">
+            <FiBell className="mx-auto h-8 w-8 text-gray-300" />
+            <p className="mt-3 text-sm font-medium text-gray-900">
+              {unreadOnly ? "No unread notifications" : "Nothing here yet"}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              We&apos;ll let you know here when your order moves, a payment or refund goes
+              through, or support replies to you.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {notifications.map((notification) => {
+              const meta = TYPE_META[notification.type] || TYPE_META.SYSTEM;
+              const Icon = meta.icon;
+              return (
+                <li key={notification.notificationId}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openNotification(notification)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openNotification(notification);
+                      }
+                    }}
+                    className={`flex cursor-pointer items-start gap-4 px-6 py-4 transition-colors hover:bg-gray-50 ${
+                      notification.read ? "" : "bg-primary/5"
+                    }`}
+                  >
+                    <div
+                      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${meta.tint}`}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
 
-      {/* Email Preferences Info */}
-      <div className="bg-gray-50 rounded-xl p-4">
-        <p className="text-sm text-gray-500 text-center">
-          You can also manage your email preferences from your email client by clicking unsubscribe at the bottom of our emails.
-        </p>
+                    <div className="min-w-0 flex-1">
+                      <h6
+                        className={`text-sm ${
+                          notification.read
+                            ? "text-gray-700"
+                            : "font-semibold text-gray-900"
+                        }`}
+                      >
+                        {notification.title}
+                      </h6>
+                      {notification.message && (
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          {notification.message}
+                        </p>
+                      )}
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        {formatWhen(notification.createdAt)}
+                      </p>
+                    </div>
+
+                    {!notification.read && (
+                      <span
+                        className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-primary"
+                        aria-label="Unread"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        remove.mutate(notification.notificationId);
+                      }}
+                      className="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+                      aria-label={`Remove notification: ${notification.title}`}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {(data?.totalPages ?? 0) > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(current - 1, 0))}
+              disabled={page === 0}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {page + 1} of {data?.totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((current) => current + 1)}
+              disabled={page + 1 >= (data?.totalPages ?? 1)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
