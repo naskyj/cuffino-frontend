@@ -472,6 +472,24 @@ const ProductDetailPage = () => {
         <div className="flex justify-center items-center h-screen">
           <ClipLoader color="#A86746" size={40} />
         </div>
+      ) : productById.isError || !result ? (
+        <div className="linearGradientBackground min-h-screen">
+          <div className="xl:px-[150px]">
+            <DesktopNavbar textColor={`!text-black `} />
+          </div>
+          <MobileNavbar utilityClassName="px-6 md:px-9 lg:px-[100px]" />
+          <div className="flex flex-col items-center gap-y-4 px-6 pt-32 text-center">
+            <h1 className="text-2xl md:text-3xl font-bold text-black">
+              This style isn&apos;t available
+            </h1>
+            <p className="text-black/70">
+              It may have been removed or isn&apos;t on sale right now.
+            </p>
+            <Link href="/shop" className="text-primary underline">
+              Back to the shop
+            </Link>
+          </div>
+        </div>
       ) : (
         <div className="">
           {/* Header with Navbar */}
