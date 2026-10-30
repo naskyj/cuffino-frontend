@@ -501,7 +501,8 @@ const ProductDetailPage = () => {
                   <Image
                     height={0}
                     width={0}
-                    src={result?.images[0].imageUrl || "/placeholder.png"}
+                    src={result?.images?.[0]?.imageUrl ||
+                      "/assets/images/ourProducts/Frame25.svg"}
                     className="w-full md:w-auto h-full md:h-[600px] object-cover rounded-lg"
                     alt={result?.name || "Product Image"}
                   />
