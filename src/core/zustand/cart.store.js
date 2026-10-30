@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+// Unit price of a line: the server's unitPrice when present, else the legacy price string
+const unitPriceOf = (item) =>
+  item?.unitPrice != null
+    ? Number(item.unitPrice)
+    : parseFloat(String(item?.price ?? "0").replace("$", "")) || 0;
+
 const useCart = create(
   persist(
     (set, get) => ({
@@ -24,7 +30,7 @@ const useCart = create(
               items: updatedItems,
               total: updatedItems.reduce(
                 (sum, item) =>
-                  sum + parseFloat(item.price.replace("$", "")) * item.quantity,
+                  sum + unitPriceOf(item) * item.quantity,
                 0
               ),
             };
@@ -36,7 +42,7 @@ const useCart = create(
               items: updatedItems,
               total: updatedItems.reduce(
                 (sum, item) =>
-                  sum + parseFloat(item.price.replace("$", "")) * item.quantity,
+                  sum + unitPriceOf(item) * item.quantity,
                 0
               ),
             };
@@ -69,6 +75,13 @@ const useCart = create(
             measurement: measurementData.measurement,
             measurementProfileId: measurementData.measurementProfileId || 0,
             customizations: measurementData.customizations || [],
+            // Pricing choices and the server's price lock travel with the line
+            unitPrice: measurementData.unitPrice,
+            pieceOption: measurementData.pieceOption,
+            fabricInventoryId: measurementData.fabricInventoryId,
+            fabricName: measurementData.fabricName,
+            clothDesign: measurementData.clothDesign,
+            priceToken: measurementData.priceToken,
           };
 
           let updatedItems;
@@ -88,7 +101,7 @@ const useCart = create(
           }
 
           const newTotal = updatedItems.reduce((sum, item) => {
-            const priceValue = parseFloat(item.price?.replace("$", "") || "0");
+            const priceValue = unitPriceOf(item);
             const quantity = item.quantity || 1;
             const itemTotal = priceValue * quantity;
             console.log(
@@ -116,7 +129,7 @@ const useCart = create(
             items: updatedItems,
             total: updatedItems.reduce(
               (sum, item) =>
-                sum + parseFloat(item.price.replace("$", "")) * item.quantity,
+                sum + unitPriceOf(item) * item.quantity,
               0
             ),
           };
@@ -137,7 +150,7 @@ const useCart = create(
             items: updatedItems,
             total: updatedItems.reduce(
               (sum, item) =>
-                sum + parseFloat(item.price.replace("$", "")) * item.quantity,
+                sum + unitPriceOf(item) * item.quantity,
               0
             ),
           };

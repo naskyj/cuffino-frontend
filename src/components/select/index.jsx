@@ -2,7 +2,7 @@
 
 import Select from "react-select";
 
-const CustomSelect = ({ value, placeholder, options, onChange, width, borderStyle, textColor }) => {
+const CustomSelect = ({ value, placeholder, options, onChange, width, borderStyle, textColor, formatOptionLabel }) => {
   return (
     <div className="text-sm md:text-base h-8 md:h-10 w-full py-0">
       <Select
@@ -11,6 +11,7 @@ const CustomSelect = ({ value, placeholder, options, onChange, width, borderStyl
         }}
         options={options}
         onChange={onChange}
+        formatOptionLabel={formatOptionLabel}
         value={value}
         placeholder={placeholder}
         styles={{

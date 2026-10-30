@@ -11,3 +11,10 @@ export const ProductServices = {
 export const InventoryServices = {
   getAllInventory: () => axiosInstance.get(`/inventory/all`),
 };
+
+export const PricingServices = {
+  getOptions: (productId, config) =>
+    axiosInstance.get(`/pricing/product/${productId}/options`, config),
+  getQuote: (payload, config) =>
+    axiosInstance.post(`/pricing/quote`, payload, config),
+};

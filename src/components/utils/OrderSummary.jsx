@@ -24,7 +24,7 @@ const OrderSummary = ({ items, subtotal, shipping, tax, total, showImages = true
               <h4 className="font-medium text-gray-900 truncate">{item.title}</h4>
               <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
               <p className="text-sm font-medium text-gray-900">
-                ${(parseFloat(item.price.replace('$', '')) * item.quantity).toFixed(2)}
+                ${(item.unitPrice != null ? Number(item.unitPrice) * item.quantity : parseFloat(item.price.replace('$', '')) * item.quantity).toFixed(2)}
               </p>
             </div>
           </div>

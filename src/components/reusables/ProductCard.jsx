@@ -25,7 +25,7 @@ const ProductCard = ({ product, utilityClassName }) => {
             {name}
           </p>
           <p className="text-sm font-medium hover:text-primary transition-colors">
-            ${price}
+            From ${String(price ?? "").replace("$", "")}
           </p>
         </div>
       </Link>

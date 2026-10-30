@@ -36,6 +36,8 @@ const CartPage = () => {
   const [totalDiscount, setTotalDiscount] = useState(null);
   const [createOrderLoader, setCreateOrderLoader] = useState(false);
   const [customizationImages, setCustomizationImages] = useState([]);
+  // Set when the server rejects the order because a price changed (409 PRICE_CHANGED)
+  const [priceChangeNotice, setPriceChangeNotice] = useState(null);
   const [
     isViewCustomizationsModalVisible,
     setIsViewCustomizationsModalVisible,
@@ -135,8 +137,13 @@ const CartPage = () => {
     return descriptor.includes("fabric");
   };
 
-  const cartSubTotal = useMemo(() => {
-    return cartItems.reduce((sum, item) => {
+  const formatMoney = (value) =>
+    value !== undefined && value !== null && Number.isFinite(Number(value))
+      ? Number(value).toFixed(2)
+      : value;
+
+  const sumCartItems = (items) =>
+    (items || []).reduce((sum, item) => {
       const unitPrice = Number(item?.unitPrice || 0);
       const quantity = Number(item?.quantity || 0);
       const itemTotal =
@@ -145,7 +152,9 @@ const CartPage = () => {
           : unitPrice * quantity;
       return sum + (Number.isFinite(itemTotal) ? itemTotal : 0);
     }, 0);
-  }, [cartItems]);
+
+  const cartSubTotal = useMemo(() => sumCartItems(cartItems), [cartItems]);
+  const hasPriceChanges = cartItems.some((item) => item?.priceChanged);
 
   const deleteCartItem = useMutation({
     mutationFn: async (cartItemId) => {
@@ -174,6 +183,8 @@ const CartPage = () => {
       setCreateOrderLoader(true); //starts loader, disables the checkout button until the order is created
       if (getCart?.data?.items.length === 0) return null;
       const response = await OrdersServices.convertToOrder(user?.userId); //convert order
+      // convert-to-order items (pieceOption, fabricInventoryId, clothDesign, priceToken,
+      // expectedUnitPrice) are passed through to /order/add unchanged
       const responseII = await OrdersServices.createOrder(response?.data); //create Order
       const createdOrderId = responseII?.data?.orderId;
 
@@ -182,6 +193,15 @@ const CartPage = () => {
       setOrderId(createdOrderId); //order id is stored in zustand, what i use for other pages
       return createdOrderId;
     } catch (error) {
+      if (
+        error?.response?.status === 409 &&
+        error?.response?.data?.code === "PRICE_CHANGED"
+      ) {
+        // A price moved since it was shown: refetch the cart and make the customer confirm
+        const fresh = await getCart.refetch();
+        setPriceChangeNotice({ newTotal: sumCartItems(fresh?.data?.items) });
+        return "PRICE_CHANGED";
+      }
       // Order creation can fail before checkout (e.g. missing default address).
       // Keep cart totals usable by falling back to computed cart subtotal.
       setTotalAmount(cartSubTotal);
@@ -276,6 +296,18 @@ const CartPage = () => {
   //   return parseFloat(price.replace("$", "")).toFixed(2);
   // };
 
+  // "Continue at new price": re-run convert-to-order (now carrying the fresh locks) and place the order
+  const handleContinueAtNewPrice = async () => {
+    const nextOrderId = await createOrder();
+    if (nextOrderId === "PRICE_CHANGED") return; // modal stays open with the newer total
+    setPriceChangeNotice(null);
+    if (!nextOrderId) {
+      toast.error("Unable to prepare order. Please try again.");
+      return;
+    }
+    router.push("/checkout/order");
+  };
+
   const calculateItemTotal = (price, quantity) => {
     return (parseFloat(price.replace("$", "")) * quantity).toFixed(2);
   };
@@ -295,6 +327,8 @@ const CartPage = () => {
 
     // Standard flow: create order only when user proceeds to checkout.
     const nextOrderId = await createOrder();
+
+    if (nextOrderId === "PRICE_CHANGED") return;
 
     if (!nextOrderId) {
       toast.error("Unable to prepare order. Please try again.");
@@ -441,6 +475,12 @@ const CartPage = () => {
           </Link>
         </div> */}
 
+          {hasPriceChanges && (
+            <div className="border border-amber-300 bg-amber-50 text-amber-800 text-sm rounded-lg p-4 mb-6 mx-3 md:mx-0">
+              Some prices in your cart have been updated. Please review them before checking out.
+            </div>
+          )}
+
           {/* Cart Items */}
           <div className="bg-white rounded-lg shadow-sm border mb-8">
             {/* Table Header */}
@@ -494,10 +534,25 @@ const CartPage = () => {
                       <p className="text-xs text-gray-600 pt-1">
                         Measurement: {item?.measurement ? "Provided" : "Not provided"}
                       </p>
-                      {selectedFabricValue && (
+                      {item?.pieceOption && (
+                        <p className="text-xs text-gray-600">
+                          Outfit:{" "}
+                          {item.pieceOption === "THREE_PIECE"
+                            ? "3-piece"
+                            : "2-piece"}
+                        </p>
+                      )}
+                      {item?.fabricName ? (
+                        <p className="text-xs text-gray-600">
+                          Fabric Type: {item.fabricName}
+                        </p>
+                      ) : selectedFabricValue && (
                         <p className="text-xs text-gray-600">
                           Fabric Type: {selectedFabricValue}
                         </p>
+                      )}
+                      {item?.clothDesign && (
+                        <p className="text-xs text-gray-600">Cloth design</p>
                       )}
                       {nonFabricCustomizations.map((customization) => (
                         <p
@@ -525,8 +580,13 @@ const CartPage = () => {
                 {/* Price */}
                 <div className="col-span-2 md:col-span-2 text-center">
                   <span className="font-medium text-gray-900">
-                    ${item?.unitPrice}
+                    ${formatMoney(item?.unitPrice)}
                   </span>
+                  {item?.priceChanged && (
+                    <p className="text-xs text-amber-700 pt-1">
+                      Price updated from ${formatMoney(item?.previousUnitPrice)} to ${formatMoney(item?.unitPrice)}
+                    </p>
+                  )}
                 </div>
 
                 {/* Quantity */}
@@ -663,6 +723,43 @@ const CartPage = () => {
               >
                 Checkout
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price changed during checkout: explicit confirmation required */}
+      {priceChangeNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              Some prices have changed
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              The price of one or more items changed since you added them. Your
+              new total is{" "}
+              <span className="font-semibold text-gray-900">
+                ${formatMoney(priceChangeNotice.newTotal)}
+              </span>
+              .
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPriceChangeNotice(null)}
+                disabled={createOrderLoader}
+                className="px-5 py-3 rounded-md border border-primary text-primary font-medium"
+              >
+                Back to cart
+              </button>
+              <button
+                type="button"
+                onClick={handleContinueAtNewPrice}
+                disabled={createOrderLoader}
+                className="px-5 py-3 rounded-md bg-primary text-white font-medium disabled:opacity-60"
+              >
+                {createOrderLoader ? "Please wait..." : "Continue at new price"}
+              </button>
             </div>
           </div>
         </div>

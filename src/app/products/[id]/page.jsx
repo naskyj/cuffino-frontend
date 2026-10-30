@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { IoChevronBack } from "react-icons/io5";
 import DesktopNavbar from "@/components/navbars/desktopNavbar";
@@ -15,7 +15,7 @@ import MobileNavbar from "@/components/navbars/mobileNavabr";
 import { useQuery } from "@tanstack/react-query";
 import axiosInstance from "@/core/api/api";
 import { ProductServices } from "@/services/product";
-import { InventoryServices } from "@/services/product";
+import { InventoryServices, PricingServices } from "@/services/product";
 import { useParams, useRouter } from "next/navigation";
 import { ClipLoader } from "react-spinners";
 import MeasurementFormModal from "@/components/modals/MeasurementFormModal";
@@ -61,6 +61,17 @@ const ProductDetailPage = () => {
   const queryClient = useQueryClient();
   const { customizationImagesCustom, setCustomizationImagesCustom } =
     useUtilityII();
+
+  // Dynamic pricing: the customer picks outfit / fabric / cloth design and the
+  // server returns a single total. The site never computes a price itself.
+  const [pieceOption, setPieceOption] = useState(null);
+  const [fabricInventoryId, setFabricInventoryId] = useState(null);
+  const [clothDesign, setClothDesign] = useState(false);
+  const [quote, setQuote] = useState(null);
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
+  const [quoteFailed, setQuoteFailed] = useState(false);
+  const [quoteRetry, setQuoteRetry] = useState(0);
+  const quoteRequestId = useRef(0);
 
   // Mock product data - in a real app, this would come from an API
   const product = {
@@ -139,7 +150,7 @@ const ProductDetailPage = () => {
       });
     }
 
-    if (selectedFabricCustomization && fabricCustomization?.customizationId) {
+    if (!isDynamic && selectedFabricCustomization && fabricCustomization?.customizationId) {
       selectedCustomizations.push({
         productCustomizationId: fabricCustomization.customizationId,
         value: selectedFabricCustomization,
@@ -184,7 +195,7 @@ const ProductDetailPage = () => {
         });
       }
 
-      if (selectedFabricCustomization && fabricCustomization?.customizationId) {
+      if (!isDynamic && selectedFabricCustomization && fabricCustomization?.customizationId) {
         selectedCustomizations.push({
           productCustomizationId: fabricCustomization.customizationId,
           value: selectedFabricCustomization,
@@ -200,6 +211,23 @@ const ProductDetailPage = () => {
         // Include uploaded customization images
         customizationImages: customizationImages,
       };
+
+      if (isDynamic) {
+        measurementDataToSend.pieceOption = pieceOption;
+        measurementDataToSend.fabricInventoryId = fabricInventoryId;
+        measurementDataToSend.clothDesign = options?.clothDesignOffered
+          ? clothDesign
+          : false;
+        // Only send the lock if it was issued for exactly these choices
+        const quoteMatches =
+          quote?.priceToken &&
+          quote.pieceOption === pieceOption &&
+          quote.fabricInventoryId === fabricInventoryId &&
+          quote.quantity === quantity &&
+          (quote.clothDesign ?? false) ===
+            (options?.clothDesignOffered ? clothDesign : false);
+        measurementDataToSend.priceToken = quoteMatches ? quote.priceToken : null;
+      }
 
       const response = await CartServices.addToCart(
         measurementDataToSend,
@@ -249,6 +277,117 @@ const ProductDetailPage = () => {
   });
 
   const result = productById.data;
+
+  const pricingOptions = useQuery({
+    queryKey: ["PricingOptions", id],
+    queryFn: async () => {
+      const { data } = await PricingServices.getOptions(id);
+      return data;
+    },
+    enabled: !!id,
+    retry: false,
+  });
+
+  const options = pricingOptions.data;
+  const isDynamic = options?.dynamicPricing === true;
+
+  // Seed the choices with the server defaults once the options arrive
+  useEffect(() => {
+    if (!options?.dynamicPricing) return;
+    // Functional updates so a background refetch never resets the customer's picks
+    setPieceOption(
+      (prev) =>
+        prev ||
+        options.defaultPieceOption ||
+        options.pieceOptions?.[0]?.option ||
+        null
+    );
+    setFabricInventoryId(
+      (prev) =>
+        prev ??
+        options.defaultFabricInventoryId ??
+        options.fabrics?.[0]?.inventoryId ??
+        null
+    );
+  }, [options]);
+
+  // Re-quote (debounced) whenever a choice or the quantity changes. Stale
+  // responses are ignored and in-flight requests aborted.
+  useEffect(() => {
+    if (!isDynamic || !pieceOption) return;
+    const requestId = ++quoteRequestId.current;
+    const controller = new AbortController();
+    setIsQuoteLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await PricingServices.getQuote(
+          {
+            productId: Number(id),
+            pieceOption,
+            fabricInventoryId,
+            clothDesign: options?.clothDesignOffered ? clothDesign : false,
+            quantity,
+          },
+          { signal: controller.signal }
+        );
+        if (requestId !== quoteRequestId.current) return;
+        setQuote(data);
+        setQuoteFailed(false);
+        setIsQuoteLoading(false);
+        // The server may resolve an unoffered choice to an offered one: adopt it
+        if (data?.pieceOption && data.pieceOption !== pieceOption) {
+          setPieceOption(data.pieceOption);
+        }
+        if (
+          data?.fabricInventoryId != null &&
+          data.fabricInventoryId !== fabricInventoryId
+        ) {
+          setFabricInventoryId(data.fabricInventoryId);
+        }
+        if (
+          options?.clothDesignOffered &&
+          typeof data?.clothDesign === "boolean" &&
+          data.clothDesign !== clothDesign
+        ) {
+          setClothDesign(data.clothDesign);
+        }
+      } catch (error) {
+        if (requestId !== quoteRequestId.current) return;
+        if (error?.code === "ERR_CANCELED") return;
+        // Keep showing the last known price; the user can retry
+        setQuoteFailed(true);
+        setIsQuoteLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isDynamic, id, pieceOption, fabricInventoryId, clothDesign, quantity, quoteRetry]);
+
+  const pieceSelectOptions = (options?.pieceOptions || []).map((item) => ({
+    value: item.option,
+    label: item.label,
+  }));
+  const fabricSelectOptions = (options?.fabrics || []).map((fabric) => ({
+    value: fabric.inventoryId,
+    label: fabric.name,
+    imageUrl: fabric.imageUrl,
+  }));
+  const clothDesignSelectOptions = [
+    { value: false, label: "None" },
+    { value: true, label: "Add cloth design" },
+  ];
+  const selectedFabric = fabricSelectOptions.find(
+    (option) => option.value === fabricInventoryId
+  );
+
+  // Only the single total is ever shown; fall back to the starting price until the first quote lands
+  const displayedPrice = isDynamic
+    ? quote?.total ?? options?.startingPrice ?? null
+    : result?.price;
 
     const allInventory = useQuery({
       queryKey: ["AllInventory"],
@@ -321,10 +460,10 @@ const ProductDetailPage = () => {
     ];
 
   useEffect(() => {
-    if (!selectedFabricCustomization && mergedFabricOptions.length > 0) {
+    if (!isDynamic && !selectedFabricCustomization && mergedFabricOptions.length > 0) {
       setSelectedFabricCustomization(mergedFabricOptions[0].value);
     }
-  }, [selectedFabricCustomization, mergedFabricOptions.length]);
+  }, [isDynamic, selectedFabricCustomization, mergedFabricOptions.length]);
 
   return (
     <>
@@ -389,16 +528,36 @@ const ProductDetailPage = () => {
                   <h1 className="text-2xl md:text-3xl font-bold text-black">
                     {result?.name}
                   </h1>
-                  <p className="text-xl md:text-2xl font-semibold text-primary pt-4 md:pt-6">
-                    $ {result?.price}
+                  <p
+                    className={`text-xl md:text-2xl font-semibold text-primary pt-4 md:pt-6 transition-opacity ${
+                      isDynamic && isQuoteLoading ? "opacity-60" : ""
+                    }`}
+                  >
+                    {isDynamic
+                      ? displayedPrice != null
+                        ? `$${Number(displayedPrice).toFixed(2)}`
+                        : "..."
+                      : `$ ${displayedPrice}`}
                   </p>
+                  {isDynamic && quoteFailed && (
+                    <p className="text-xs text-gray-500 pt-1">
+                      Couldn&apos;t refresh the price, showing the last known price.{" "}
+                      <button
+                        type="button"
+                        onClick={() => setQuoteRetry((n) => n + 1)}
+                        className="text-primary underline"
+                      >
+                        Retry
+                      </button>
+                    </p>
+                  )}
                 </div>
 
                 <div className="">
                   <p className="text-black leading-relaxed mb-4">
                     {result?.description}
                   </p>
-                  {selectFabricOptions.length > 0 && (
+                  {!isDynamic && selectFabricOptions.length > 0 && (
                     <p className="text-gray-600 pt-2">
                       <strong>Fabric Type:</strong>{" "}
                       {selectFabricOptions.map((option) => option.label).join(", ")}
@@ -409,7 +568,81 @@ const ProductDetailPage = () => {
                   </p> */}
                 </div>
 
-                {mergedFabricOptions.length > 0 && (
+                {isDynamic && (
+                  <>
+                    {pieceSelectOptions.length > 0 && (
+                      <div>
+                        <label className="text-base sm:text-lg font-medium text-gray-900 block">
+                          Outfit
+                        </label>
+                        <CustomSelect
+                          className="w-full"
+                          options={pieceSelectOptions}
+                          borderStyle={true}
+                          onChange={(option) => {
+                            setPieceOption(option?.value || null);
+                            setIsAddedToCart(false);
+                          }}
+                          value={pieceSelectOptions.find(
+                            (option) => option.value === pieceOption
+                          )}
+                        />
+                      </div>
+                    )}
+
+                    {fabricSelectOptions.length > 0 && (
+                      <div className="pt-4">
+                        <label className="text-base sm:text-lg font-medium text-gray-900 block">
+                          Fabric
+                        </label>
+                        <CustomSelect
+                          className="w-full"
+                          options={fabricSelectOptions}
+                          borderStyle={true}
+                          formatOptionLabel={(option) => (
+                            <div className="flex items-center gap-x-2">
+                              {option.imageUrl && (
+                                <img
+                                  src={option.imageUrl}
+                                  alt=""
+                                  className="w-6 h-6 rounded object-cover"
+                                />
+                              )}
+                              <span>{option.label}</span>
+                            </div>
+                          )}
+                          onChange={(option) => {
+                            setFabricInventoryId(option?.value ?? null);
+                            setIsAddedToCart(false);
+                          }}
+                          value={selectedFabric}
+                        />
+                      </div>
+                    )}
+
+                    {options?.clothDesignOffered && (
+                      <div className="pt-4">
+                        <label className="text-base sm:text-lg font-medium text-gray-900 block">
+                          Cloth design
+                        </label>
+                        <CustomSelect
+                          className="w-full"
+                          options={clothDesignSelectOptions}
+                          borderStyle={true}
+                          onChange={(option) => {
+                            setClothDesign(option?.value === true);
+                            setIsAddedToCart(false);
+                          }}
+                          value={clothDesignSelectOptions.find(
+                            (option) => option.value === clothDesign
+                          )}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {!isDynamic && !pricingOptions.isLoading && mergedFabricOptions.length > 0 && (
                   <div>
                     <label className="text-base sm:text-lg font-medium text-gray-900 block">
                       Available Fabric <span className="text-red-600">*</span>
@@ -731,7 +964,7 @@ const ProductDetailPage = () => {
         isVisible={isMeasurementModalVisible}
         onClose={() => setIsMeasurementModalVisible(false)}
         productId={id}
-        productPrice={`$${result?.price}`}
+        productPrice={`$${displayedPrice}`}
         productName={result?.name}
         productImage={result?.images?.[0]?.imageUrl}
         quantity={quantity}
