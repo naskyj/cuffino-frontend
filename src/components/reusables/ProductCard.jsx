@@ -1,22 +1,28 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
+
+export const FABRIC_PLACEHOLDER = "/assets/images/fabric-placeholder.svg";
 
 const ProductCard = ({ product, utilityClassName }) => {
   const { productId, id, name, price, images = [], imageUrl } = product || {};
+  const [failed, setFailed] = useState(false);
 
-  const imageUrlLink = images[0]?.imageUrl || imageUrl || "/placeholder.png";
+  const imageUrlLink =
+    (!failed && (images?.[0]?.imageUrl || imageUrl)) || FABRIC_PLACEHOLDER;
   const prdId = productId || id;
 
   return (
     <div className={`group `} key={prdId}>
       <Link href={`/products/${prdId}`} className="block">
-        <div className="relative overflow-hidden duration-500">
+        <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#F3E3D3] duration-500 group-hover:rounded-lg">
           <Image
-            height={400}
-            width={324}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 25vw"
             src={`${imageUrlLink}`}
-            className={`${utilityClassName || ""} w-full h-auto object-cover duration-500 group-hover:rounded-lg`}
+            onError={() => setFailed(true)}
+            className={`${utilityClassName || ""} object-cover object-top duration-500`}
             alt={name || "Product image"}
           />
         </div>

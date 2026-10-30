@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <defs>
+    <pattern id="weave" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="#F3E3D3"/>
+      <path d="M0 10h40M0 30h40" stroke="#E4C9AE" stroke-width="6"/>
+      <path d="M10 0v40M30 0v40" stroke="#D9B692" stroke-width="3" opacity=".7"/>
+    </pattern>
+    <pattern id="kente" width="160" height="160" patternUnits="userSpaceOnUse">
+      <path d="M80 10l70 70-70 70-70-70z" fill="none" stroke="#B5694A" stroke-width="3" opacity=".35"/>
+      <path d="M80 40l40 40-40 40-40-40z" fill="none" stroke="#B5694A" stroke-width="2" opacity=".3"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="1000" fill="url(#weave)"/>
+  <rect width="800" height="1000" fill="url(#kente)"/>
+  <text x="400" y="520" text-anchor="middle" font-family="Georgia, serif" font-size="44" letter-spacing="10" fill="#8A4B30" opacity=".75">CUFFINO</text>
+</svg>

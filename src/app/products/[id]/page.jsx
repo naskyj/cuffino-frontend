@@ -42,6 +42,7 @@ const ProductDetailPage = () => {
     useState("");
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
+  const [activeImage, setActiveImage] = useState(0);
   const [isMeasurementModalVisible, setIsMeasurementModalVisible] =
     useState(false);
   const [hasCompletedMeasurement, setHasCompletedMeasurement] = useState(false);
@@ -493,34 +494,48 @@ const ProductDetailPage = () => {
           <div className="  py-12 px-6 md:px-9 lg:px-[100px] xl:px-[150px] 2xl:px-[150px]">
             {/* Product Details */}
 
-            <div className="flex flex-col md:flex-row md:justify-between md:gap-x-12 xl:gap-x-0 mb-16">
+            <div className="flex flex-col md:flex-row md:justify-center md:items-start md:gap-x-12 lg:gap-x-16 mb-16">
               {/* Product Images */}
-              <div className="space-y-4 ">
+              <div className="space-y-4 md:w-[420px] lg:w-[500px] shrink-0">
                 {/* Main Image */}
-                <div className="relative">
+                <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-[#F3E3D3]">
                   <Image
-                    height={0}
-                    width={0}
-                    src={result?.images?.[0]?.imageUrl ||
-                      "/assets/images/ourProducts/Frame25.svg"}
-                    className="w-full md:w-auto h-full md:h-[600px] object-cover rounded-lg"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 500px"
+                    src={
+                      result?.images?.[activeImage]?.imageUrl ||
+                      result?.images?.[0]?.imageUrl ||
+                      "/assets/images/fabric-placeholder.svg"
+                    }
+                    className="object-cover object-top"
                     alt={result?.name || "Product Image"}
                   />
                 </div>
                 {/* Thumbnail Images */}
-                <div className="grid grid-cols-2 gap-4">
-                  {result?.images?.map((thumbnail, index) => (
-                    <div key={index} className="relative">
-                      <Image
-                        height={0}
-                        width={0}
-                        src={thumbnail.imageUrl}
-                        className="w-full md:w-auto md:h-[300px] object-cover rounded-lg cursor-pointer"
-                        alt={`${result?.name}` || "Product Image"}
-                      />
-                    </div>
-                  ))}
-                </div>
+                {result?.images?.length > 1 && (
+                  <div className="grid grid-cols-5 gap-2">
+                    {result.images.map((thumbnail, index) => (
+                      <button
+                        type="button"
+                        key={index}
+                        onClick={() => setActiveImage(index)}
+                        className={`relative aspect-square overflow-hidden rounded-md border-2 ${
+                          index === activeImage
+                            ? "border-primary"
+                            : "border-transparent"
+                        }`}
+                      >
+                        <Image
+                          fill
+                          sizes="100px"
+                          src={thumbnail.imageUrl}
+                          className="object-cover object-top"
+                          alt={`${result?.name} ${index + 1}`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Product Info */}
