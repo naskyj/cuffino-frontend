@@ -76,6 +76,10 @@ const OrderCheckoutPage = () => {
       toast.error("Quantity must be at least 1");
       return;
     }
+    if (newQuantity > 10) {
+      toast.error("You can order up to 10 of one item. For larger orders, please contact us.");
+      return;
+    }
     updateCartItem.mutate({ cartItemId, quantity: newQuantity });
   };
 

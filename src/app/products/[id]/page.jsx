@@ -28,6 +28,9 @@ import useUtility from "@/core/zustand/utility";
 import CustomSelect from "@/components/select";
 import useUtilityII from "@/core/zustand/utilityII";
 
+// Largest quantity of one item per order (the server enforces the same limit)
+const MAX_QUANTITY = 10;
+
 const ProductDetailPage = () => {
   const { id } = useParams();
   const router = useRouter();
@@ -127,7 +130,7 @@ const ProductDetailPage = () => {
 
   const handleQuantityChange = (increment) => {
     const newQuantity = quantity + increment;
-    if (newQuantity >= 1) {
+    if (newQuantity >= 1 && newQuantity <= MAX_QUANTITY) {
       setQuantity(newQuantity);
       // Reset added to cart status when quantity changes
       setIsAddedToCart(false);
@@ -833,11 +836,17 @@ const ProductDetailPage = () => {
                       type="number"
                       value={quantity}
                       onChange={(e) => {
-                        setQuantity(parseInt(e.target.value) || 1);
+                        setQuantity(
+                          Math.min(
+                            Math.max(parseInt(e.target.value) || 1, 1),
+                            MAX_QUANTITY
+                          )
+                        );
                         setIsAddedToCart(false);
                       }}
                       className="w-20 h-10 border border-[#A8674699] rounded-md text-center focus:outline-none focus:ring-2 focus:ring-primary"
                       min="1"
+                      max={MAX_QUANTITY}
                     />
                     <button
                       onClick={() => handleQuantityChange(1)}
@@ -846,6 +855,12 @@ const ProductDetailPage = () => {
                       +
                     </button>
                   </div>
+                  {quantity >= MAX_QUANTITY && (
+                    <p className="text-sm text-gray-600 pt-2">
+                      Up to {MAX_QUANTITY} per order. For larger orders, please
+                      contact us.
+                    </p>
+                  )}
                 </div>
 
                 {/* Image Customization Section */}
