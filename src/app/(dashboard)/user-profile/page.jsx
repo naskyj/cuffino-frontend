@@ -269,9 +269,9 @@ export default function UserProfile() {
                 disable={
                   formik.isSubmitting ||
                   !formik.isValid ||
-                  updateMutation.isLoading
+                  updateMutation.isPending
                 }
-                loading={formik.isSubmitting || updateMutation.isLoading}
+                loading={formik.isSubmitting || updateMutation.isPending}
               >
                 Save Changes
               </Button>

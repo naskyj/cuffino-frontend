@@ -128,8 +128,8 @@ export default function VerifyUser() {
                     <Button
                       className="bg-[#A86746] text-white rounded-lg !text-base"
                       type="submit"
-                      disable={isOtpEmpty || mutation.isLoading}
-                      loading={mutation.isLoading}
+                      disable={isOtpEmpty || mutation.isPending}
+                      loading={mutation.isPending}
                       onClick={mutation.mutate}
                     >
                       Verify &amp; Proceed

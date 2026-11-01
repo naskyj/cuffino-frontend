@@ -462,10 +462,10 @@ const OrderCheckoutPage = () => {
               <Button
                 type="button"
                 onClick={handlePayNowClick}
-                disable={!orderId || !selectedAddressId || createOrderLoader || updateOrderShipmentMutation.isLoading}
+                disable={!orderId || !selectedAddressId || createOrderLoader || updateOrderShipmentMutation.isPending}
                 className="bg-[#A86746] text-white rounded-lg !text-base min-w-[290px] lg:!min-w-[600px]"
               >
-                {updateOrderShipmentMutation.isLoading ? "Updating Address..." : "Pay Now"}
+                {updateOrderShipmentMutation.isPending ? "Updating Address..." : "Pay Now"}
               </Button>
               </div>
             

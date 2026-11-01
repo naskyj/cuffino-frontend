@@ -232,7 +232,7 @@ export default function Login() {
                             <Button
                               className="bg-[#A86746] text-white rounded-lg !text-base min-w-[290px] lg:!min-w-[600px]"
                               type="submit"
-                              disable={mutation.isLoading}
+                              disable={mutation.isPending}
                               loading={
                                  loading
                               }

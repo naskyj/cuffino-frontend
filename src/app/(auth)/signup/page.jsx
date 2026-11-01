@@ -229,8 +229,8 @@ export default function Signup() {
                             <Button
                               className="bg-[#A86746] text-white rounded-lg !text-base min-w-[290px] lg:!min-w-[600px]"
                               type="submit"
-                              disable={mutation.isLoading}
-                              loading={mutation.isLoading}
+                              disable={mutation.isPending}
+                              loading={mutation.isPending}
                             >
                               {formik.isSubmitting ? "Register" : "Register"}
                             </Button>

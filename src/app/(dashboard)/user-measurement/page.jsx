@@ -493,7 +493,7 @@ export default function UserMeasurement() {
                     type="submit"
                     className="bg-primary text-white rounded-lg px-8 py-3 font-medium hover:bg-primary/90 transition-all"
                     disable={formik.isSubmitting || !formik.isValid}
-                    loading={formik.isSubmitting || addMutation.isLoading}
+                    loading={formik.isSubmitting || addMutation.isPending}
                   >
                     Save Measurement
                   </Button>
@@ -563,7 +563,7 @@ export default function UserMeasurement() {
                     <button
                       onClick={() => handleDelete(measurement.profileId || measurement.measurementId)}
                       className="w-9 h-9 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-all"
-                      disabled={deleteMutation.isLoading}
+                      disabled={deleteMutation.isPending}
                     >
                       <FiTrash2 size={18} />
                     </button>

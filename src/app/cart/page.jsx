@@ -518,7 +518,7 @@ const CartPage = () => {
                   <button
                     onClick={() => deleteCartItem.mutate(item?.cartItemId)}
                     className="text-red-500 hover:text-red-700 transition-colors"
-                    disabled={deleteCartItem.isLoading}
+                    disabled={deleteCartItem.isPending}
                   >
                     <FiTrash2 size={20} />
                   </button>
