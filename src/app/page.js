@@ -301,8 +301,8 @@ export default function Home() {
     <div className="">
       <MobileNavbar utilityClassName="px-6" />
 
-      <div className="xl:bg-hero">
-        <div className=" relative lg:px-[100px] bg-black/50  2xl:px-[100px]  bg-center bg-cover bg-no-repeat  xl:h-screen w-screen ">
+      <div className="xl:bg-hero xl:bg-cover xl:bg-no-repeat xl:bg-[center_top]">
+        <div className=" relative lg:px-[100px] bg-black/50  2xl:px-[100px]  bg-center bg-cover bg-no-repeat  xl:h-screen w-full ">
           <DesktopNavbar isLogoBlack={false} />
 
           {/* hero */}
@@ -320,6 +320,34 @@ export default function Home() {
                 <button
                   type="button"
                   className="bg-white text-[#A86746] flex items-center px-4 py-2 text-lg rounded-lg gap-2"
+                >
+                  <p>Start Custom Order</p>
+                  <FaArrowRight className="text-base" />
+                </button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* mobile hero */}
+      {/* Full width under the header; sized to the picture's own 9:5 shape and anchored to the top so heads are never cut */}
+      <div className="pt-6 xl:hidden">
+        <div className="bg-hero bg-cover bg-no-repeat bg-[center_top] w-full aspect-[9/5] min-h-[320px]">
+          <div className="flex flex-col items-center justify-center h-full gap-y-5">
+            <div
+              className={`${playFair.className} text-center px-4 leading-tight font-[500] text-xl md:text-3xl text-white flex flex-col items-center`}
+            >
+              <h2 className="uppercase">
+                YOUR CULTURE. YOUR FIT. <br /> PERFECTLY TAILORED IN NIGERIA,{" "}
+                <br /> DELIVERED TO YOU
+              </h2>
+            </div>
+            <div className="flex justify-center">
+              <Link href="/shop">
+                <button
+                  type="button"
+                  className="bg-white text-[#A86746] flex items-center px-4 py-2 text-sm rounded-lg gap-2"
                 >
                   <p>Start Custom Order</p>
                   <FaArrowRight className="text-base" />
@@ -362,33 +390,6 @@ export default function Home() {
             <FaArrowRight className="text-sm text-white" />
           </div>
         </button>
-      </div>
-
-      {/* mobile hero */}
-      <div className="px-6 pt-9 xl:hidden">
-        <div className=" xl:hidden bg-hero rounded-md bg-center bg-cover bg-no-repeat w-full h-[260px] md:h-[450px]">
-          <div className="flex flex-col items-center justify-center h-full gap-y-5">
-            <div
-              className={`${playFair.className} leading-tight font-[500] text-xl md:text-3xl text-white flex flex-col items-center`}
-            >
-              <h2 className="uppercase">
-                YOUR CULTURE. YOUR FIT. <br /> PERFECTLY TAILORED IN NIGERIA,{" "}
-                <br /> DELIVERED TO YOU
-              </h2>
-            </div>
-            <div className="flex justify-center">
-              <Link href="/shop">
-                <button
-                  type="button"
-                  className="bg-white text-[#A86746] flex items-center px-4 py-2 text-sm rounded-lg gap-2"
-                >
-                  <p>Start Custom Order</p>
-                  <FaArrowRight className="text-base" />
-                </button>
-              </Link>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* shop cuffino */}
@@ -455,7 +456,7 @@ export default function Home() {
 
       {/* our collection */}
       <div className="pt-8">
-        <div className="bg-primary w-screen px-6 pt-[50px] lg:pt-[90px] pb-[90px] lg:pb-[130px]">
+        <div className="bg-primary w-full px-6 pt-[50px] lg:pt-[90px] pb-[90px] lg:pb-[130px]">
           <div className="text-white flex flex-col justify-center items-center gap-y-5">
             <h3 className="font-semibold text-xl md:text-2xl lg:text-3xl">
               Our Collection
@@ -529,7 +530,7 @@ export default function Home() {
       </div>
 
       {/* Signup for new collections */}
-      <div className="bg-primary w-screen mt-[70px] py-[40px] lg:py-[75px] px-6 lg:px-0">
+      <div className="bg-primary w-full mt-[70px] py-[40px] lg:py-[75px] px-6 lg:px-0">
         <div className="flex flex-col justify-center items-center">
           <p className="text-white text-2xl lg:text-3xl font-semibold pb-4">
             Be the first to know!

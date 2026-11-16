@@ -71,8 +71,9 @@ export default function Login() {
       }
       setProfilePromptDismissed(false); // Reset so profile prompt shows
       toast.success("Login successful");
+      // Only follow same-site paths, never an outside address
       const from = searchParams.get("from") || "/";
-      router.push(from);
+      router.push(from.startsWith("/") && !from.startsWith("//") ? from : "/");
       setLoading(false);
     },
     onError: (error) => {
