@@ -155,8 +155,7 @@ const testimonials = [
       "Cuffino made it easy for me to get my custom trad outfit delivered here without any stress, and it was just how i wanted it. Top-notch!",
     name: "Adunni",
     location: "Houston",
-    imageUrl:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=400&fit=crop&crop=faces&q=80",
+    tone: { bg: "#A86746", fg: "#F6EDE4" },
   },
   {
     id: 2,
@@ -164,8 +163,7 @@ const testimonials = [
       "The fit was perfect and the fabric quality exceeded what I expected. Working with the team felt personal from start to finish.",
     name: "Chioma",
     location: "Atlanta",
-    imageUrl:
-      "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400&h=400&fit=crop&crop=faces&q=80",
+    tone: { bg: "#E8D5C4", fg: "#7A4529" },
   },
   {
     id: 3,
@@ -173,10 +171,52 @@ const testimonials = [
       "I ordered matching outfits for our family event and everything arrived on time, beautifully sewn. Cuffino is now my go-to.",
     name: "Kemi",
     location: "Dallas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1589156191108-c762ff4b96ab?w=400&h=400&fit=crop&crop=faces&q=80",
+    tone: { bg: "#3D2A20", fg: "#E8D5C4" },
   },
 ];
+
+// Placeholder for customer photos: initial over a woven-lattice pattern in a brand shade
+const TestimonialMonogram = ({ name, tone }) => (
+  <div
+    className="absolute inset-0 flex items-center justify-center"
+    style={{ backgroundColor: tone.bg, color: tone.fg }}
+  >
+    <svg
+      className="absolute inset-0 h-full w-full opacity-20"
+      aria-hidden
+    >
+      <defs>
+        <pattern
+          id={`weave-${name}`}
+          width="28"
+          height="28"
+          patternUnits="userSpaceOnUse"
+        >
+          <path
+            d="M14 0 L28 14 L14 28 L0 14 Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+          />
+          <circle cx="14" cy="14" r="2" fill="currentColor" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#weave-${name})`} />
+    </svg>
+    <span
+      className="absolute left-4 top-1 text-6xl leading-none opacity-40"
+      aria-hidden
+    >
+      &ldquo;
+    </span>
+    <span
+      className={`${playFair.className} relative text-7xl font-medium md:text-6xl`}
+      aria-hidden
+    >
+      {name.charAt(0)}
+    </span>
+  </div>
+);
 
 export default function Home() {
   const searchRef = useRef(null);
@@ -573,12 +613,9 @@ export default function Home() {
 
         <div className="mt-10 flex flex-col gap-8 md:flex-row md:items-stretch md:gap-12 lg:gap-16">
           <div className="relative mx-auto aspect-square w-full max-w-[280px] shrink-0 overflow-hidden bg-[#E8D5C4] md:mx-0 md:max-w-[200px]">
-            <Image
-              src={activeTestimonial.imageUrl}
-              alt={`${activeTestimonial.name}, ${activeTestimonial.location}`}
-              fill
-              sizes="(max-width: 560px) 200px, 200px"
-              className="object-cover"
+            <TestimonialMonogram
+              name={activeTestimonial.name}
+              tone={activeTestimonial.tone}
             />
           </div>
           <div className="flex min-h-0 flex-1 flex-col justify-center">
